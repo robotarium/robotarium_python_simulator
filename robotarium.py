@@ -38,4 +38,5 @@ class Robotarium(RobotariumABC):
                     self.arrow_patches[i] = a
                     self.axes.add_patch(a)
 
-                self.figure.canvas.draw()
+            self.figure.canvas.draw()
+            self.figure.canvas.flush_events()
