@@ -7,19 +7,30 @@ import itertools
 import numpy as np
 from scipy.special import comb
 
-from . import transformations
+from .transformations import *
+import timeit
+import time
 
+# Disable output of CVXOPT
 options['show_progress'] = False
 
-def create_single_integrator_barrier_certificate(number_of_agents, barrier_gain=10000,safety_radius=0.08):
-    """ TODO: comment
+def create_single_integrator_barrier_certificate(number_of_agents, barrier_gain=10000, safety_radius=0.08, magnitude_limit=0.08):
+    """Creates a barrier certificate for a single-integrator system.  This function
+    returns another function for optimization reasons.
+
+    number_of_agents: int (number of agents.  should be a constant)
+    barrier_gain: double (controls how quickly agents can approach each other.  lower = slower)
+    safety_radius: double (how far apart the agents will stay)
+
+    -> function (the barrier certificate function)
     """
 
+    # Initialize some variables for computational savings
     N = number_of_agents
     num_constraints = int(comb(N, 2))
     A = np.zeros((num_constraints, 2*N))
     b = np.zeros(num_constraints)
-    H = 2*np.identity(2*N)
+    H = sparse(matrix(2*np.identity(2*N)))
 
     def f(dxi, x):
 
@@ -28,15 +39,20 @@ def create_single_integrator_barrier_certificate(number_of_agents, barrier_gain=
             for j in range(i+1, N):
                 error = x[:, i] - x[:, j]
                 h = (error[0]*error[0] + error[1]*error[1]) - np.power(safety_radius, 2)
+
                 A[count, (2*i, (2*i+1))] = -2*error
                 A[count, (2*j, (2*j+1))] = 2*error
                 b[count] = barrier_gain*np.power(h, 3)
 
                 count += 1
 
-        f = -2*np.reshape(dxi, 2*N, order='F')
+        # Threshold control inputs before QP
+        norms = np.linalg.norm(dxi, 2, 0)
+        idxs_to_normalize = (norms > magnitude_limit)
+        dxi[:, idxs_to_normalize] /= magnitude_limit*(1/norms[idxs_to_normalize])
 
-        result = qp(matrix(H), matrix(f), matrix(A), matrix(b))['x']
+        f = -2*np.reshape(dxi, 2*N, order='F')
+        result = qp(H, matrix(f), matrix(A), matrix(b))['x']
 
         return np.reshape(result, (2, -1), order='F')
 
@@ -59,6 +75,6 @@ def create_unicycle_barrier_certificate(number_of_agents, barrier_gain=8000, saf
         """Barrier certificate function."""
 
         x_si = to_si_states(states)
-        return dyn(si_barrier_cert(unicycle_to_single_integrator(dxu), states))
+        return dyn(si_barrier_cert(unicycle_to_single_integrator(dxu, states), x_si), states)
 
     return f

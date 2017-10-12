@@ -5,6 +5,8 @@ from abc import ABC, abstractmethod
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import matplotlib.lines as lines
+from matplotlib.animation import FuncAnimation
 
 import utilities.misc
 
@@ -28,6 +30,7 @@ class RobotariumABC(ABC):
         self.velocities = np.zeros((2, number_of_agents))
         self.poses = utilities.misc.generate_initial_conditions(self.number_of_agents)
         self.saved_poses = []
+        self.saved_velocities = []
         self.led_commands = []
 
         # Visualization
@@ -45,22 +48,22 @@ class RobotariumABC(ABC):
             self.figure, self.axes = plt.subplots()
             for i in range(number_of_agents):
                 p = patches.Circle(self.poses[:2,i], self.robot_size, fill=False)
-                a = patches.Arrow(*self.poses[:2,i],
-                    self.robot_size*np.cos(self.poses[2,i]),
-                    self.robot_size*np.sin(self.poses[2,i]),
-                    width=0.03)
+                front = patches.Circle(self.poses[:2,i]+0.5*np.array((self.robot_size*np.cos(self.poses[2,i]), self.robot_size*np.sin(self.poses[2,i]))),
+                self.robot_size/3, fill=False)
 
                 self.circle_patches.append(p)
-                self.arrow_patches.append(a)
+                self.arrow_patches.append(front)
                 self.axes.add_patch(p)
-                self.axes.add_patch(a)
+                self.axes.add_patch(front)
 
             # Draw arena
-            self.axes.add_patch(patches.Rectangle((-0.6, -0.3), 1.2, 0.6, fill=False))
+            self.axes.add_patch(patches.Rectangle((-6.5, -5.5), 13, 11, fill=False))
 
-            self.axes.set_xlim(-0.7, 0.7)
-            self.axes.set_ylim(-0.4, 0.4)
-            self.figure.show()
+            self.axes.set_xlim(-6.5, 6.5)
+            self.axes.set_ylim(-5.5, 5.5)
+
+            plt.ion()
+            plt.show()
 
     def set_velocities(self, ids, velocities):
 

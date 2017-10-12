@@ -24,7 +24,7 @@ p_circ = np.vstack([
 flag = 0
 x_goal = p_circ[:, :N]
 
-for k in range(1000):
+for k in range(10000):
 
     # Do stuff
     x = r.get_poses()
