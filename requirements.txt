@@ -1,0 +1,5 @@
+# Required libraries
+cvxopt
+scipy
+numpy
+matplotlib

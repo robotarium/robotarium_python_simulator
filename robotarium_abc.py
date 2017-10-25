@@ -6,7 +6,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import matplotlib.lines as lines
-from matplotlib.animation import FuncAnimation
+
+import threading
 
 import utilities.misc
 
@@ -18,7 +19,7 @@ class RobotariumABC(ABC):
         self.show_figure = show_figure
         self.save_data = save_data
 
-        self.file_path = ""
+        self.file_path = None
         self.current_file_size = 0
 
         # Constants
@@ -40,7 +41,7 @@ class RobotariumABC(ABC):
         self.circle_patches = []
 
         if(self.save_data):
-            self.file_path = "robotarium_data" + repr(time.time())
+            self.file_path = "robotarium_data_" + repr(int(round(time.time())))
 
         self.arrow_patches = []
 

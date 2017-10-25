@@ -1,7 +1,7 @@
-import ..robotarium
-import ..utilities.graph as graph
-import ..utilities.transformations as transformations
-from ..utilities.barrier_certificates import *
+import robotarium
+import utilities.graph as graph
+import utilities.transformations as transformations
+from utilities.barrier_certificates import *
 
 import numpy as np
 
@@ -13,7 +13,7 @@ si_to_uni_dyn, si_to_uni_states = transformations.create_single_integrator_to_un
 
 L = graph.cycle_GL(N)
 
-si_barrier_cert = create_single_integrator_barrier_certificate()
+si_barrier_cert = create_single_integrator_barrier_certificate(N)
 
 for k in range(1000):
 
@@ -30,3 +30,5 @@ for k in range(1000):
 
     r.set_velocities(np.arange(N), si_to_uni_dyn(si_velocities, x))
     r.step()
+
+r.call_at_scripts_end()

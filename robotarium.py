@@ -8,22 +8,33 @@ from robotarium_abc import *
 
 class Robotarium(RobotariumABC):
 
-        def __init__(self, number_of_agents=10, show_figure=True, save_data=True, update_time=0.1):
+        def __init__(self, number_of_agents=10, show_figure=True, save_data=True, update_time=1):
             super().__init__(number_of_agents, show_figure, save_data)
 
-            #
+            #Initialize some rendering variables
             self.previous_render_time = time.time()
             self.update_time = update_time
 
         def call_at_scripts_end(self):
-            pass
+            """Call this function at the end of scripts to write data.  Even if you
+            don't write any data, calling this function at the end of your script will
+            accelerate execution on the server.
+            """
+            if(self.save_data):
+                try:
+                    np.save(self.file_path, self.saved_poses)
+                except Exception as e:
+                    raise
 
         def get_poses(self):
+            """Returns the states of the agents.
+
+            -> 3xN numpy array (of robot poses)
+            """
             return self.poses
 
         def step(self):
-            """DOCUMENT
-
+            """Increments the simulation by updating the dynamics.
             """
 
             # Save data
