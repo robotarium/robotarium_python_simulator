@@ -33,7 +33,7 @@ def create_single_integrator_barrier_certificate(number_of_agents, barrier_gain=
     H = sparse(matrix(2*np.identity(2*N)))
 
     def f(dxi, x):
-
+        """ TODO: comment"""
         count = 0
         for i in range(N-1):
             for j in range(i+1, N):
@@ -59,7 +59,15 @@ def create_single_integrator_barrier_certificate(number_of_agents, barrier_gain=
     return f
 
 def create_unicycle_barrier_certificate(number_of_agents, barrier_gain=8000, safety_radius=0.08, projection_distance=0.05, magnitude_limit=0.08):
-    """ TODO: comment
+    """ TODO: Creates a unicycle barrier cetifcate to avoid collisions.  For
+    optimization purposes, this function returns another function.
+
+    number_of_agents: int
+    barrier_gain: double (how fast the robots can approach each other)
+    safety_radius: double (how far apart the robots should stay)
+    projection_distance: double (how far ahead to place the bubble)
+
+    -> function (the unicycle barrier certificate function)
     """
     N = number_of_agents
     num_constraints = int(comb(N, 2))
@@ -72,7 +80,7 @@ def create_unicycle_barrier_certificate(number_of_agents, barrier_gain=8000, saf
     dyn, to_si_states = create_single_integrator_to_unicycle(projection_distance=projection_distance)
 
     def f(dxu, states):
-        """Barrier certificate function."""
+        """TODO: comment """
 
         x_si = to_si_states(states)
         return dyn(si_barrier_cert(unicycle_to_single_integrator(dxu, states), x_si), states)
