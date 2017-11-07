@@ -36,4 +36,4 @@ There are a variety of examples in the 'examples' folder.  Check these out befor
 starting your simulation!
 
 # Submission Instructions
-When your simulation is complete, go the the Robotarium [website!][https://www.robotarium.org], follow the instructions there, and see your code run on real robots!
+When your simulation is complete, go the the Robotarium [website](https://www.robotarium.org), follow the instructions there, and see your code run on real robots!
