@@ -6,9 +6,9 @@ from rps.utilities.controllers import *
 import numpy as np
 
 # How many robots we want to use in the simulation
-N = 10
+N = 5
 # Instantiate the Robotarium object with these parameters
-r = robotarium.Robotarium(number_of_agents=N)
+r = robotarium.Robotarium(number_of_agents=N, show_figure=False)
 
 # How many iterations do we want (about 165 seconds)
 iterations=5000
@@ -22,7 +22,8 @@ si_barrier_cert = create_single_integrator_barrier_certificate(N)
 
 # This portion of the code generates points on a circle enscribed in a 6x6 square
 # that's centered on the origin.  The robots switch positions on the circle.
-xybound = [-3, 3, -3, 3]
+size = 0.5
+xybound = size*np.array([-1, 1, -1, 1])
 p_theta = 2*np.pi*(np.arange(0, 2*N, 2)/(2*N))
 p_circ = np.vstack([
             np.hstack([xybound[1]*np.cos(p_theta), xybound[1]*np.cos(p_theta+np.pi)]),

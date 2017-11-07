@@ -30,11 +30,17 @@ while(np.size(at_pose(x, goal_points, rotation_error=100)) != N):
     x = r.get_poses()
     x_si = x[:2, :]
 
-    # Single integrator velocities
+    # Create single-integrator control inputs
     dxi = single_integrator_position_controller(x_si, goal_points[:2, :], magnitude_limit=0.08)
 
-    # Create safe control inputs
+    # Create safe control inputs (i.e., no collisions)
     dxi = si_barrier_cert(dxi, x_si)
 
+    # Set the velocities by mapping the single-integrator inputs to unciycle inputs
     r.set_velocities(np.arange(N), single_integrator_to_unicycle2(dxi, x))
+    # Iterate the simulation
     r.step()
+
+# Always call this function at the end of your scripts!  It will accelerate the
+# execution of your experiment
+r.call_at_scripts_end()
