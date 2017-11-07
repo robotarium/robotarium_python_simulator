@@ -1,7 +1,7 @@
 import numpy as np
 
 
-def generate_initial_conditions(N, spacing=0.1, width=13, height=11):
+def generate_initial_conditions(N, spacing=0.1, width=3, height=3):
     """Generates random initial conditions in an area of the specified
     width and height at the required spacing.
 

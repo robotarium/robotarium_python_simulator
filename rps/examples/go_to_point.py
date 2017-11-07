@@ -1,9 +1,9 @@
-import robotarium
-import utilities.graph as graph
-from utilities.transformations import *
-from utilities.barrier_certificates import *
-from utilities.misc import *
-from utilities.controllers import *
+import rps.robotarium as robotarium
+import rps.utilities.graph as graph
+from rps.utilities.transformations import *
+from rps.utilities.barrier_certificates import *
+from rps.utilities.misc import *
+from rps.utilities.controllers import *
 
 import numpy as np
 import time

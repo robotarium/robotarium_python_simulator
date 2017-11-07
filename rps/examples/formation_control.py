@@ -1,7 +1,7 @@
-import robotarium
-from utilities import graph
-from utilities import transformations
-from utilities.barrier_certificates import *
+import rps.robotarium as robotarium
+from rps.utilities import graph
+from rps.utilities import transformations
+from rps.utilities.barrier_certificates import *
 
 # Array representing the geometric distances betwen the agents.  In this case,
 # the agents try to form a Rectangle

@@ -1,8 +1,8 @@
-import robotarium
-from utilities.transformations import *
-from utilities.barrier_certificates import *
-from utilities.misc import *
-from utilities.controllers import *
+import rps.robotarium as robotarium
+from rps.utilities.transformations import *
+from rps.utilities.barrier_certificates import *
+from rps.utilities.misc import *
+from rps.utilities.controllers import *
 
 import numpy as np
 

@@ -29,7 +29,7 @@ class RobotariumABC(ABC):
         self.time_step = 0.033
 
         self.velocities = np.zeros((2, number_of_agents))
-        self.poses = misc.generate_initial_conditions(self.number_of_agents)
+        self.poses = misc.generate_initial_conditions(self.number_of_agents, width=3, height=3)
         self.saved_poses = []
         self.saved_velocities = []
         self.led_commands = []
@@ -58,10 +58,10 @@ class RobotariumABC(ABC):
                 self.axes.add_patch(front)
 
             # Draw arena
-            self.axes.add_patch(patches.Rectangle((-6.5, -5.5), 13, 11, fill=False))
+            self.axes.add_patch(patches.Rectangle((-1.5, -1.5), 3, 3, fill=False))
 
-            self.axes.set_xlim(-6.5, 6.5)
-            self.axes.set_ylim(-5.5, 5.5)
+            self.axes.set_xlim(-1.6, 1.6)
+            self.axes.set_ylim(-1.6, 1.6)
 
             plt.ion()
             plt.show()
