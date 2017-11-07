@@ -1,4 +1,3 @@
-import math
 import time
 from abc import ABC, abstractmethod
 
@@ -6,8 +5,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import matplotlib.lines as lines
-
-import threading
 
 import rps.utilities.misc as misc
 
@@ -19,12 +16,15 @@ class RobotariumABC(ABC):
         self.show_figure = show_figure
         self.save_data = save_data
 
+        # Boundary stuff -> lower left point / width / height
+        self.boundary = [-1.5, -1.5, 3, 3]
+
         self.file_path = None
         self.current_file_size = 0
 
         # Constants
         self.max_linear_velocity = 0.1
-        self.max_angular_velocity = 2*math.pi
+        self.max_angular_velocity = 2*np.pi
         self.robot_size = 0.02
         self.time_step = 0.033
 
@@ -58,10 +58,10 @@ class RobotariumABC(ABC):
                 self.axes.add_patch(front)
 
             # Draw arena
-            self.axes.add_patch(patches.Rectangle((-1.5, -1.5), 3, 3, fill=False))
+            self.axes.add_patch(patches.Rectangle(self.boundary[:2], self.boundary[2], self.boundary[3], fill=False))
 
-            self.axes.set_xlim(-1.6, 1.6)
-            self.axes.set_ylim(-1.6, 1.6)
+            self.axes.set_xlim(self.boundary[0]-0.1, self.boundary[0]+self.boundary[2]+0.1)
+            self.axes.set_ylim(self.boundary[1]-0.1, self.boundary[1]+self.boundary[3]+0.1)
 
             plt.ion()
             plt.show()
