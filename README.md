@@ -2,9 +2,9 @@
 A Python simulator for the Robotarium!
 
 # Alpha Warning 
-Warning: This simulator is currently in "alpha", so there may be some restructuring, renaming, and general changes.  For best results, **clone frequently.**  
+Warning: This simulator is currently in "alpha", so there may be some restructuring, renaming, and general changes.  For best results, **clone frequently.**  There shouldn't be any ground-breaking changes, but some restructuring may occur as we work on the backend code that's associated with the simulator.
 
-There shouldn't be any ground-breaking changes, but some restructuring may occur as we work on the backend code that's associated with the simulator.
+We're furiously documenting this repository, but there may be some sections without documentation.  Please, bear with us as we roll the docs out.  In the meantime, everything should be fully functional.
 
 # Installation (Linux)
 This simulator is built using Python 3.5, so you'll need to install that on your system.
