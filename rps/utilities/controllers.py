@@ -1,5 +1,5 @@
 import numpy as np
-from .transformations import *
+from rps.utilities.transformations import *
 
 def single_integrator_position_controller(x, poses, gain=1, magnitude_limit=0.08):
     """A position controller for single integrators.  Drives a single integrator to a point

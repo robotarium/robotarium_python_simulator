@@ -9,7 +9,7 @@ import matplotlib.lines as lines
 
 import threading
 
-import utilities.misc
+import rps.utilities.misc as misc
 
 class RobotariumABC(ABC):
 
@@ -29,7 +29,7 @@ class RobotariumABC(ABC):
         self.time_step = 0.033
 
         self.velocities = np.zeros((2, number_of_agents))
-        self.poses = utilities.misc.generate_initial_conditions(self.number_of_agents)
+        self.poses = misc.generate_initial_conditions(self.number_of_agents)
         self.saved_poses = []
         self.saved_velocities = []
         self.led_commands = []

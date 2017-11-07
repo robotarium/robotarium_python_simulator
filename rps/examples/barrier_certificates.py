@@ -1,8 +1,8 @@
-import robotarium
-import utilities.graph as graph
-import utilities.transformations as transformations
-from utilities.barrier_certificates import *
-from utilities.controllers import *
+import rps.robotarium as robotarium
+import rps.utilities.graph as graph
+import rps.utilities.transformations as transformations
+from rps.utilities.barrier_certificates import *
+from rps.utilities.controllers import *
 import numpy as np
 
 # How many robots we want to use in the simulation

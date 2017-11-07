@@ -7,7 +7,7 @@ import itertools
 import numpy as np
 from scipy.special import comb
 
-from .transformations import *
+from rps.utilities.transformations import *
 import timeit
 import time
 

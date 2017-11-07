@@ -4,7 +4,7 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from robotarium_abc import *
+from rps.robotarium_abc import *
 
 class Robotarium(RobotariumABC):
 

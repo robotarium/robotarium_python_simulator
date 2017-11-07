@@ -1,3 +1,0 @@
-sudo apt-get install python3-tk
-sudo python3.5 -m pip install cvxopt
-sudo python3.5 -m pip install scipy
