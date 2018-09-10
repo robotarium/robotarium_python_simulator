@@ -33,7 +33,7 @@ weights = np.array([
 iterations = 2000
 N = 6
 
-r = robotarium.Robotairum(number_of_agents=N, number_of_agents=10, show_figure=True, save_data=True, update_time=1)
+r = robotarium.Robotarium(number_of_agents=N, show_figure=True, save_data=True, update_time=1)
 
 si_barrier_cert = create_single_integrator_barrier_certificate(N)
 

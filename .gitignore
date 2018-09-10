@@ -3,6 +3,12 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+# vim files
+*.swp
+
+# ignore generated datafile
+*.npy
+
 # C extensions
 *.so
 
