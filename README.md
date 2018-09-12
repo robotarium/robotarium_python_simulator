@@ -29,5 +29,15 @@ Though, these are included in the setup.py file.  For the absolutely correct lis
 There are a variety of examples in the 'examples' folder.  Check these out before
 starting your simulation!
 
+You can run the examples with
+```
+./run_sim.py rps/examples/<example_name>.py
+```
+
+You can also run the examples without the wrapper, but it won't perform any dependnecy sanity checks.
+```
+python3 rps/examples/<example_name>.py
+```
+
 # Submission Instructions
 When your simulation is complete, go the the Robotarium [website](https://www.robotarium.org), follow the instructions there, and see your code run on real robots!
