@@ -11,11 +11,22 @@ This simulator is built using Python 3.5, so you'll need to install that on your
 
 We haven't been able to test with previous versions yet, but anything 3.x should work. 
 
+## Users
 To install, navigate the directory in which you cloned the simulator.  Then, run 
 ```
 sudo pip3 install .
 ```
 This instruction will install the necessary packages and the simulator on your system.  Don't forget the '.' on the end!  Once this installation is complete, you should be able to run the examples in the 'examples' folder.
+
+If you want to edit the simulator files, you will need to follow the directions in the Developers section.
+
+## Developers
+Anyone who wants to modify the simulator code or contribute back to the repository will need the installed robotarium module to be editable. To install the module in editable mode, run
+```
+sudo pip3 install -e .
+```
+
+If you have an existing installation of the rps module, this will overwrite it in the cache by symlinking those cached files to the ones in the cloned repositoy.
 
 # Dependencies
 The dependencies are:
