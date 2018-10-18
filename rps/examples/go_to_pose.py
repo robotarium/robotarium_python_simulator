@@ -8,7 +8,7 @@ import numpy as np
 
 # Instantiate Robotarium object
 N = 5
-r = robotarium.Robotarium(number_of_agents=N)
+r = robotarium.Robotarium(number_of_agents=N, show_figure=True, save_data=True, update_time=1)
 
 # Define goal points by removing orientation from poses
 goal_points = generate_initial_conditions(N)

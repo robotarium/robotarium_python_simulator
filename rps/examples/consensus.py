@@ -7,7 +7,7 @@ import numpy as np
 
 # Instantiate Robotarium object
 N = 10
-r = robotarium.Robotarium(number_of_agents=N)
+r = robotarium.Robotarium(number_of_agents=N, show_figure=True, save_data=True, update_time=1)
 
 # This consensus algorithm uses single-integrator dynamics, so we'll need these mappings.
 si_to_uni_dyn, si_to_uni_states = transformations.create_single_integrator_to_unicycle()

@@ -9,8 +9,8 @@ import numpy as np
 import time
 
 # Instantiate Robotarium object
-N = 5
-r = robotarium.Robotarium(number_of_agents=N)
+N = 1
+r = robotarium.Robotarium(number_of_agents=N, show_figure=True, save_data=True, update_time=1)
 
 # Define goal points by removing orientation from poses
 goal_points = generate_initial_conditions(N)
@@ -24,7 +24,7 @@ r.step()
 
 # While the number of robots at the required poses is less
 # than N...
-while(np.size(at_pose(x, goal_points, rotation_error=100)) != N):
+while (np.size(at_pose(x, goal_points, rotation_error=100)) != N):
 
     # Get poses of agents
     x = r.get_poses()

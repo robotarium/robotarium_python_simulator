@@ -24,7 +24,7 @@ def single_integrator_position_controller(x, poses, gain=1, magnitude_limit=0.08
 
     return dxi
 
-def unicycle_pose_controller(x, poses, magnitude_limit=0.08, position_error=0.01, rotation_error=0.25):
+def unicycle_pose_controller(x, poses, magnitude_limit=0.04, position_error=0.01, rotation_error=0.25):
     """  A pose controller for unicycle models.  This is a hybrid controller that first
     drives the unicycle to a point then turns the unicycle to match the orientation.
 
