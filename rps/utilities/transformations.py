@@ -1,6 +1,6 @@
 import numpy as np
 
-def single_integrator_to_unicycle2(dxi, poses, linear_velocity_gain=1, angular_velocity_limit=np.pi/6):
+def single_integrator_to_unicycle2(dxi, poses, linear_velocity_gain=1, angular_velocity_limit=np.pi/4):
     """A mapping from single-integrator to unicycle dynamics.
 
     dxi: 2xN numpy array with single-integrator control inputs
