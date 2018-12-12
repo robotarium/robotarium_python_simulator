@@ -8,7 +8,7 @@ import numpy as np
 # How many robots we want to use in the simulation
 N = 10
 # Instantiate the Robotarium object with these parameters
-r = robotarium.Robotarium(number_of_agents=N, show_figure=True, save_data=True, update_time=1)
+r = robotarium.Robotarium(number_of_agents=N, show_figure=True, save_data=True, update_time=0.1)
 
 # How many iterations do we want (about 165 seconds)
 iterations = 5000
@@ -64,6 +64,7 @@ for k in range(iterations):
 
     # Use the barrier certificates to make sure that the agents don't collide
     dxi = si_barrier_cert(dxi, x_si)
+
     # Use the second single-integrator-to-unicycle mapping to map to unicycle
     # dynamics
     dxu = transformations.single_integrator_to_unicycle2(dxi, x)
