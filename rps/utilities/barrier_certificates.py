@@ -14,7 +14,7 @@ import time
 # Disable output of CVXOPT
 options['show_progress'] = False
 
-def create_single_integrator_barrier_certificate(number_of_agents, barrier_gain=10000, safety_radius=0.08, magnitude_limit=0.08):
+def create_single_integrator_barrier_certificate(number_of_agents, barrier_gain=100, safety_radius=0.15, magnitude_limit=0.35):
     """Creates a barrier certificate for a single-integrator system.  This function
     returns another function for optimization reasons.
 
@@ -49,7 +49,7 @@ def create_single_integrator_barrier_certificate(number_of_agents, barrier_gain=
         # Threshold control inputs before QP
         norms = np.linalg.norm(dxi, 2, 0)
         idxs_to_normalize = (norms > magnitude_limit)
-        dxi[:, idxs_to_normalize] /= magnitude_limit*(1/norms[idxs_to_normalize])
+        dxi[:, idxs_to_normalize] *= magnitude_limit/norms[idxs_to_normalize]
 
         f = -2*np.reshape(dxi, 2*N, order='F')
         result = qp(H, matrix(f), matrix(A), matrix(b))['x']
@@ -58,7 +58,7 @@ def create_single_integrator_barrier_certificate(number_of_agents, barrier_gain=
 
     return f
 
-def create_unicycle_barrier_certificate(number_of_agents, barrier_gain=8000, safety_radius=0.08, projection_distance=0.05, magnitude_limit=0.08):
+def create_unicycle_barrier_certificate(number_of_agents, barrier_gain=80, safety_radius=0.15, projection_distance=0.03, magnitude_limit=0.4):
     """ TODO: Creates a unicycle barrier cetifcate to avoid collisions.  For
     optimization purposes, this function returns another function.
 

@@ -24,7 +24,7 @@ r.step()
 
 # While the number of robots at the required poses is less
 # than N...
-while(np.size(at_pose(x, goal_points, rotation_error=100)) != N):
+while (np.size(at_pose(x, goal_points, rotation_error=100)) != N):
 
     # Get poses of agents
     x = r.get_poses()
