@@ -20,7 +20,7 @@ def single_integrator_position_controller(x, poses, gain=1, magnitude_limit=0.08
     # Threshold magnitude
     norms = np.linalg.norm(dxi, axis=0)
     idxs = np.where(norms > magnitude_limit)
-    dxi[:, idxs] = dxi[:, idxs] / norms[idxs]
+    dxi[:, idxs] *= magnitude_limit/norms[idxs]
 
     return dxi
 
