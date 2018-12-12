@@ -14,7 +14,7 @@ import time
 # Disable output of CVXOPT
 options['show_progress'] = False
 
-def create_single_integrator_barrier_certificate(number_of_agents, barrier_gain=10000, safety_radius=0.15, magnitude_limit=0.4):
+def create_single_integrator_barrier_certificate(number_of_agents, barrier_gain=100, safety_radius=0.15, magnitude_limit=0.35):
     """Creates a barrier certificate for a single-integrator system.  This function
     returns another function for optimization reasons.
 
@@ -58,7 +58,7 @@ def create_single_integrator_barrier_certificate(number_of_agents, barrier_gain=
 
     return f
 
-def create_unicycle_barrier_certificate(number_of_agents, barrier_gain=8000, safety_radius=0.15, projection_distance=0.03, magnitude_limit=0.4):
+def create_unicycle_barrier_certificate(number_of_agents, barrier_gain=80, safety_radius=0.15, projection_distance=0.03, magnitude_limit=0.4):
     """ TODO: Creates a unicycle barrier cetifcate to avoid collisions.  For
     optimization purposes, this function returns another function.
 

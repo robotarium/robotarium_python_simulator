@@ -26,7 +26,7 @@ class RobotariumABC(ABC):
         self.max_linear_velocity = 0.4
         self.max_angular_velocity = 4*np.pi
 
-        self.robot_size = 0.11
+        self.robot_size = 0.055
         self.time_step = 0.033
 
         self.velocities = np.zeros((2, number_of_agents))
