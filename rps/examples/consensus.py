@@ -10,7 +10,7 @@ N = 10
 r = robotarium.Robotarium(number_of_agents=N, show_figure=True, save_data=True, update_time=1)
 
 # This consensus algorithm uses single-integrator dynamics, so we'll need these mappings.
-si_to_uni_dyn, si_to_uni_states = transformations.create_single_integrator_to_unicycle()
+si_to_uni_dyn, uni_to_si_states = transformations.create_single_integrator_to_unicycle()
 
 # Generated a connected graph Laplacian (for a cylce graph).
 L = graph.cycle_GL(N)
@@ -22,7 +22,7 @@ for k in range(1000):
 
     # Get the poses of the robots and convert to single-integrator poses
     x = r.get_poses()
-    x_si = si_to_uni_states(x)
+    x_si = uni_to_si_states(x)
 
     # Initialize the single-integrator control inputs
     si_velocities = np.zeros((2, N))

@@ -17,7 +17,7 @@ class RobotariumABC(ABC):
         self.save_data = save_data
 
         # Boundary stuff -> lower left point / width / height
-        self.boundary = [-1.5, -1, 3, 2]
+        self.boundary = [-1.6, -1, 3.2, 2]
 
         self.file_path = None
         self.current_file_size = 0
@@ -25,7 +25,8 @@ class RobotariumABC(ABC):
         # Constants
         self.max_linear_velocity = 0.4
         self.max_angular_velocity = 4*np.pi
-        self.robot_size = 0.02
+
+        self.robot_size = 0.11
         self.time_step = 0.033
 
         self.velocities = np.zeros((2, number_of_agents))
@@ -60,6 +61,7 @@ class RobotariumABC(ABC):
 
             # Draw arena
             self.boundary_patch = self.axes.add_patch(patches.Rectangle(self.boundary[:2], self.boundary[2], self.boundary[3], fill=False))
+
             self.axes.set_xlim(self.boundary[0]-0.1, self.boundary[0]+self.boundary[2]+0.1)
             self.axes.set_ylim(self.boundary[1]-0.1, self.boundary[1]+self.boundary[3]+0.1)
 
