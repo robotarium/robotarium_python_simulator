@@ -53,9 +53,23 @@ class Robotarium(RobotariumABC):
                 t = time.time()
                 if((t - self.previous_render_time) > self.update_time):
                     for i in range(self.number_of_agents):
-                        self.circle_patches[i].center = self.poses[:2, i]
-                        self.arrow_patches[i].center = self.poses[:2, i]+0.5*np.array((self.robot_size*np.cos(self.poses[2,i]), self.robot_size*np.sin(self.poses[2,i])))
+                        self.chassis_patches[i].center = self.poses[:2, i]
+                        self.chassis_patches[i].orientation = self.poses[2, i] + math.pi/4
+
+                        self.right_wheel_patches[i].center = self.poses[:2, i]+self.robot_size*np.array((np.cos(self.poses[2, i]+math.pi/2), np.sin(self.poses[2, i]+math.pi/2)))+\
+                                                0.04*np.array((-np.sin(self.poses[2, i]+math.pi/2), np.cos(self.poses[2, i]+math.pi/2)))
+                        self.right_wheel_patches[i].orientation = self.poses[2, i] + math.pi/4
+
+                        self.left_wheel_patches[i].center = self.poses[:2, i]+self.robot_size*np.array((np.cos(self.poses[2, i]-math.pi/2), np.sin(self.poses[2, i]-math.pi/2)))+\
+                                                0.04*np.array((-np.sin(self.poses[2, i]+math.pi/2), np.cos(self.poses[2, i]+math.pi/2)))
+                        self.left_wheel_patches[i].orientation = self.poses[2,i] + math.pi/4
+                        
+                        self.right_led_patches[i].center = self.poses[:2, i]+0.75*self.robot_size*np.array((np.cos(self.poses[2,i]), np.sin(self.poses[2,i])))-\
+                                        0.04*np.array((-np.sin(self.poses[2, i]), np.cos(self.poses[2, i])))
+                        self.left_led_patches[i].center = self.poses[:2, i]+0.75*self.robot_size*np.array((np.cos(self.poses[2,i]), np.sin(self.poses[2,i])))-\
+                                        0.015*np.array((-np.sin(self.poses[2, i]), np.cos(self.poses[2, i])))
 
                     self.figure.canvas.draw_idle()
                     self.figure.canvas.flush_events()
                     self.previous_render_time = t
+

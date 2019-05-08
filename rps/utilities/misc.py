@@ -48,3 +48,19 @@ def at_pose(states, poses, position_error=0.02, rotation_error=0.5):
     done = np.nonzero((res <= rotation_error) & (pes <= position_error))
 
     return done
+
+def at_position(states, poses, position_error=0.02):
+    """Checks whether robots are "close enough" to desired position
+
+    states: 3xN numpy array (of unicycle states)
+    poses: 3xN numpy array (of desired states)
+
+    -> 1xN numpy index array (of agents that are close enough)
+    """
+    # Calculate position errors
+    pes = np.linalg.norm(states[:2, :] - poses[:2, :], 2, 0)
+
+    # Determine which agents are done
+    done = np.nonzero((pes <= position_error))
+
+    return done

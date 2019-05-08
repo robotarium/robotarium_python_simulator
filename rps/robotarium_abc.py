@@ -1,4 +1,5 @@
 import time
+import math
 from abc import ABC, abstractmethod
 
 import numpy as np
@@ -30,34 +31,56 @@ class RobotariumABC(ABC):
         self.time_step = 0.033
 
         self.velocities = np.zeros((2, number_of_agents))
-        self.poses = misc.generate_initial_conditions(self.number_of_agents, width=3, height=3)
+        self.poses = misc.generate_initial_conditions(self.number_of_agents, spacing=0.2, width=2.5, height=1.5)
         self.saved_poses = []
         self.saved_velocities = []
-        self.led_commands = []
+        self.left_led_commands = []
+        self.right_led_commands = []
 
         # Visualization
         self.figure = []
         self.axes = []
-        self.arrow_patches = []
-        self.circle_patches = []
+        self.left_led_patches = []
+        self.right_led_patches = []
+        self.chassis_patches = []
+        self.right_wheel_patches = []
+        self.left_wheel_patches = []
 
         if(self.save_data):
             self.file_path = "robotarium_data_" + repr(int(round(time.time())))
-
-        self.arrow_patches = []
 
         if(self.show_figure):
             self.figure, self.axes = plt.subplots()
             self.axes.set_axis_off()
             for i in range(number_of_agents):
-                p = patches.Circle(self.poses[:2, i], self.robot_size, fill=False)
-                front = patches.Circle(self.poses[:2, i]+0.5*np.array((self.robot_size*np.cos(self.poses[2, i]), self.robot_size*np.sin(self.poses[2, i]))),
-                                       self.robot_size/3, fill=False)
+                p = patches.RegularPolygon(self.poses[:2, i], 4, math.sqrt(2)*self.robot_size, self.poses[2,i]+math.pi/4, facecolor='#FFD700', edgecolor = 'k')
+                rled = patches.Circle(self.poses[:2, i]+0.75*self.robot_size*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i]))+\
+                                        0.04*np.array((-np.sin(self.poses[2, i]+math.pi/2), np.cos(self.poses[2, i]+math.pi/2)))),\
+                                       self.robot_size/5, fill=False)
+                lled = patches.Circle(self.poses[:2, i]+0.75*self.robot_size*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i]))+\
+                                        0.015*np.array((-np.sin(self.poses[2, i]+math.pi/2), np.cos(self.poses[2, i]+math.pi/2)))),\
+                                       self.robot_size/5, fill=False)
+                rw = patches.Circle(self.poses[:2, i]+self.robot_size*np.array((np.cos(self.poses[2, i]+math.pi/2), np.sin(self.poses[2, i]+math.pi/2)))+\
+                                                0.04*np.array((-np.sin(self.poses[2, i]+math.pi/2), np.cos(self.poses[2, i]+math.pi/2))),\
+                                                0.02, facecolor='k')
+                lw = patches.Circle(self.poses[:2, i]+self.robot_size*np.array((np.cos(self.poses[2, i]-math.pi/2), np.sin(self.poses[2, i]-math.pi/2)))+\
+                                                0.04*np.array((-np.sin(self.poses[2, i]+math.pi/2))),\
+                                                0.02, facecolor='k')
+                #lw = patches.RegularPolygon(self.poses[:2, i]+self.robot_size*np.array((np.cos(self.poses[2, i]-math.pi/2), np.sin(self.poses[2, i]-math.pi/2)))+\
+                #                                0.035*np.array((-np.sin(self.poses[2, i]+math.pi/2), np.cos(self.poses[2, i]+math.pi/2))),\
+                #                                4, math.sqrt(2)*0.02, self.poses[2,i]+math.pi/4, facecolor='k')
 
-                self.circle_patches.append(p)
-                self.arrow_patches.append(front)
+                self.chassis_patches.append(p)
+                self.left_led_patches.append(lled)
+                self.right_led_patches.append(rled)
+                self.right_wheel_patches.append(rw)
+                self.left_wheel_patches.append(lw)
+
+                self.axes.add_patch(rw)
+                self.axes.add_patch(lw)
                 self.axes.add_patch(p)
-                self.axes.add_patch(front)
+                self.axes.add_patch(lled)
+                self.axes.add_patch(rled)
 
             # Draw arena
             self.boundary_patch = self.axes.add_patch(patches.Rectangle(self.boundary[:2], self.boundary[2], self.boundary[3], fill=False))
