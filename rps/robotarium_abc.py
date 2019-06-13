@@ -11,7 +11,7 @@ import rps.utilities.misc as misc
 
 class RobotariumABC(ABC):
 
-    def __init__(self, number_of_agents=10, show_figure=True, save_data=True):
+    def __init__(self, number_of_agents=10, show_figure=True, initial_conditions = None, save_data=True):
 
         self.number_of_agents = number_of_agents
         self.show_figure = show_figure
@@ -31,7 +31,16 @@ class RobotariumABC(ABC):
         self.time_step = 0.033
 
         self.velocities = np.zeros((2, number_of_agents))
-        self.poses = misc.generate_initial_conditions(self.number_of_agents, spacing=0.2, width=2.5, height=1.5)
+
+        if initial_conditions is not None:
+            if initial_conditions.shape == (3,self.number_of_agents):
+                self.poses = initial_conditions
+            else :
+                raise Exception('Initial conditions entered are not acceptable by the Robotarium Simulator')
+        else:
+            self.poses = misc.generate_initial_conditions(self.number_of_agents, spacing=0.2, width=2.5, height=1.5)
+
+
         self.saved_poses = []
         self.saved_velocities = []
         self.left_led_commands = []

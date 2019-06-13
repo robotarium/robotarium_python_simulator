@@ -8,8 +8,8 @@ from rps.robotarium_abc import *
 
 class Robotarium(RobotariumABC):
 
-        def __init__(self, number_of_agents=10, show_figure=True, save_data=True, update_time=1):
-            super().__init__(number_of_agents, show_figure, save_data)
+        def __init__(self, number_of_agents=10, show_figure=True, initial_conditions = None, save_data=True, update_time=1):
+            super().__init__(number_of_agents, show_figure, initial_conditions, save_data)
 
             #Initialize some rendering variables
             self.previous_render_time = time.time()
@@ -63,7 +63,7 @@ class Robotarium(RobotariumABC):
                         self.left_wheel_patches[i].center = self.poses[:2, i]+self.robot_size*np.array((np.cos(self.poses[2, i]-math.pi/2), np.sin(self.poses[2, i]-math.pi/2)))+\
                                                 0.04*np.array((-np.sin(self.poses[2, i]+math.pi/2), np.cos(self.poses[2, i]+math.pi/2)))
                         self.left_wheel_patches[i].orientation = self.poses[2,i] + math.pi/4
-                        
+
                         self.right_led_patches[i].center = self.poses[:2, i]+0.75*self.robot_size*np.array((np.cos(self.poses[2,i]), np.sin(self.poses[2,i])))-\
                                         0.04*np.array((-np.sin(self.poses[2, i]), np.cos(self.poses[2, i])))
                         self.left_led_patches[i].center = self.poses[:2, i]+0.75*self.robot_size*np.array((np.cos(self.poses[2,i]), np.sin(self.poses[2,i])))-\
@@ -72,4 +72,3 @@ class Robotarium(RobotariumABC):
                     self.figure.canvas.draw_idle()
                     self.figure.canvas.flush_events()
                     self.previous_render_time = t
-
