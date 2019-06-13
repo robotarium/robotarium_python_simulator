@@ -32,7 +32,7 @@ class RobotariumABC(ABC):
 
         self.velocities = np.zeros((2, number_of_agents))
 
-        if initial_conditions:
+        if initial_conditions is not None:
             if initial_conditions.shape == (3,self.number_of_agents):
                 self.poses = initial_conditions
             else :
