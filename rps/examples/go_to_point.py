@@ -1,5 +1,4 @@
 import rps.robotarium as robotarium
-import rps.utilities.graph as graph
 from rps.utilities.transformations import *
 from rps.utilities.barrier_certificates import *
 from rps.utilities.misc import *
@@ -10,7 +9,9 @@ import time
 
 # Instantiate Robotarium object
 N = 5
-r = robotarium.Robotarium(number_of_agents=N, show_figure=True, save_data=True, update_time=1)
+#initial_conditions = np.array(np.mat('1 0.5 -0.5; 0 0 0; 0 0 0'))
+#r = robotarium.Robotarium(number_of_robots=N, show_figure=True, initial_conditions=initial_conditions, update_time=0.1)
+r = robotarium.Robotarium(number_of_robots=N, show_figure=True, sim_in_real_time=False)
 
 # Define goal points by removing orientation from poses
 goal_points = generate_initial_conditions(N)
@@ -31,7 +32,7 @@ while (np.size(at_pose(x, goal_points, rotation_error=100)) != N):
     x_si = x[:2, :]
 
     # Create single-integrator control inputs
-    dxi = single_integrator_position_controller(x_si, goal_points[:2, :], magnitude_limit=0.08)
+    dxi = single_integrator_position_controller(x_si, goal_points[:2, :], magnitude_limit=0.15)
 
     # Create safe control inputs (i.e., no collisions)
     dxi = si_barrier_cert(dxi, x_si)
@@ -40,7 +41,3 @@ while (np.size(at_pose(x, goal_points, rotation_error=100)) != N):
     r.set_velocities(np.arange(N), single_integrator_to_unicycle2(dxi, x))
     # Iterate the simulation
     r.step()
-
-# Always call this function at the end of your scripts!  It will accelerate the
-# execution of your experiment
-r.call_at_scripts_end()
