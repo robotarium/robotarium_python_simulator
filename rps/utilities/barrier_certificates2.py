@@ -7,8 +7,8 @@ solvers.options['reltol'] = 1e-2 # was e-2
 solvers.options['feastol'] = 1e-2 # was e-4
 solvers.options['maxiters'] = 50 # default is 100
 
-def create_robust_barriers(max_num_obstacles = 30, max_num_robots = 30, d = 0, wheel_vel_limit = 25, base_length = 0.105, wheel_radius = 0.016,
-    projection_distance =0.03, gamma = 150, safety_radius = 0.12): # gamma was 150
+def create_robust_barriers(max_num_obstacles = 100, max_num_robots = 30, d = 5, wheel_vel_limit = 12.5, base_length = 0.105, wheel_radius = 0.016,
+    projection_distance =0.05, gamma = 150, safety_radius = 0.12): # gamma was 150
     D = np.matrix([[wheel_radius/2, wheel_radius/2], [-wheel_radius/base_length, wheel_radius/base_length]])
     L = np.matrix([[1,0],[0,projection_distance]])* D
     disturb = np.matrix([[-d, -d, d, d],[-d, d, d, -d]])
