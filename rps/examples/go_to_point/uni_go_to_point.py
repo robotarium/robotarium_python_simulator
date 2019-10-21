@@ -9,15 +9,17 @@ import time
 
 # Instantiate Robotarium object
 N = 5
-#initial_conditions = np.array(np.mat('1 0.5 -0.5; 0 0 0; 0 0 0'))
-#r = robotarium.Robotarium(number_of_robots=N, show_figure=True, initial_conditions=initial_conditions, update_time=0.1)
-r = robotarium.Robotarium(number_of_robots=N, show_figure=True, sim_in_real_time=False)
+initial_conditions = np.array(np.mat('1 0.5 -0.5 0 0.28; 0.8 -0.3 -0.75 0.1 0.34; 0 0 0 0 0'))
+r = robotarium.Robotarium(number_of_robots=N, show_figure=True, initial_conditions=initial_conditions,sim_in_real_time=True)
 
 # Define goal points by removing orientation from poses
 goal_points = generate_initial_conditions(N)
 
+# Create unicycle position controller
+unicycle_position_controller = create_clf_unicycle_position_controller()
+
 # Create barrier certificates to avoid collision
-si_barrier_cert = create_single_integrator_barrier_certificate(N)
+uni_barrier_cert = create_unicycle_barrier_certificate()
 
 # define x initially
 x = r.get_poses()
@@ -29,15 +31,15 @@ while (np.size(at_pose(x, goal_points, rotation_error=100)) != N):
 
     # Get poses of agents
     x = r.get_poses()
-    x_si = x[:2, :]
 
     # Create single-integrator control inputs
-    dxi = single_integrator_position_controller(x_si, goal_points[:2, :], magnitude_limit=0.15)
+    dxu = unicycle_position_controller(x, goal_points[:2][:])
 
     # Create safe control inputs (i.e., no collisions)
-    dxi = si_barrier_cert(dxi, x_si)
+    dxu = uni_barrier_cert(dxu, x)
 
     # Set the velocities by mapping the single-integrator inputs to unciycle inputs
-    r.set_velocities(np.arange(N), single_integrator_to_unicycle2(dxi, x))
+    r.set_velocities(np.arange(N), dxu)
+
     # Iterate the simulation
     r.step()
