@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 def generate_initial_conditions(N, spacing=0.3, width=3, height=1.8):
@@ -100,3 +101,29 @@ def at_position(states, points, position_error=0.02):
     done = np.nonzero((pes <= position_error))
 
     return done
+
+def determine_marker_size(robotarium_instance, marker_size_meters):
+
+	# Get the x and y dimension of the robotarium figure window in pixels
+	fig_dim_pixels = robotarium_instance.axes.transData.transform(np.array([[robotarium_instance.boundaries[2]],[robotarium_instance.boundaries[3]]]))
+
+	# Determine the ratio of the robot size to the x-axis (the axis are
+	# normalized so you could do this with y and figure height as well).
+	marker_ratio = (marker_size_meters)/(robotarium_instance.boundaries[2])
+
+	# Determine the marker size in points so it fits the window. Note: This is squared
+	# as marker sizes are areas.
+	return (fig_dim_pixels[0,0] * marker_ratio)**2.
+
+
+def determine_font_size(robotarium_instance, font_height_meters):
+
+	# Get the x and y dimension of the robotarium figure window in pixels
+	fig_dim_pixels = robotarium_instance.axes.transData.transform(np.array([[robotarium_instance.boundaries[2]],[robotarium_instance.boundaries[3]]]))
+
+	# Determine the ratio of the robot size to the y-axis.
+	font_ratio = (font_height_meters)/(robotarium_instance.boundaries[3])
+
+	# Determine the marker size in points so it fits the window. Note: This is squared
+	# as marker sizes are areas.
+	return (fig_dim_pixels[0,1] * font_ratio)
