@@ -66,7 +66,7 @@ while(1):
     g.set_offsets(x[:2,:].T)
     # This updates the marker sizes if the figure window size is changed. 
     # This should be removed when submitting to the Robotarium.
-    g.set_sizes(determine_marker_size(r,safety_radius))
+    g.set_sizes([determine_marker_size(r,safety_radius)])
 
     # We're planning on using the single-integrator to unciycle mapping,
     # so our single-integrator states are the projected point.
