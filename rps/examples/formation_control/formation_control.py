@@ -1,7 +1,10 @@
+#Import Robotarium Utilities
 import rps.robotarium as robotarium
-from rps.utilities import graph
-from rps.utilities import transformations
+from rps.utilities.transformations import *
+from rps.utilities.graph import *
 from rps.utilities.barrier_certificates import *
+from rps.utilities.misc import *
+from rps.utilities.controllers import *
 
 # Array representing the geometric distances betwen the agents.  In this case,
 # the agents try to form a Rectangle
@@ -15,9 +18,9 @@ L = np.array([
 ])
 
 # Some gains for this experiment.  These aren't incredibly relevant.
-d = 0.2
+d = 0.3
 ddiag = np.sqrt(5)*d
-formation_control_gain = 4
+formation_control_gain = 10
 
 # Weight matrix to control inter-agent distances
 weights = np.array([
@@ -33,9 +36,9 @@ weights = np.array([
 iterations = 2000
 N = 6
 
-r = robotarium.Robotarium(number_of_agents=N, show_figure=True, save_data=True, update_time=1)
-si_barrier_cert = create_single_integrator_barrier_certificate(N)
-
+r = robotarium.Robotarium(number_of_robots=N, show_figure=True, sim_in_real_time=True)
+si_barrier_cert = create_single_integrator_barrier_certificate_with_boundary()
+si_to_uni_dyn = create_si_to_uni_dynamics()
 
 for k in range(iterations):
 
@@ -46,7 +49,7 @@ for k in range(iterations):
     dxi = np.zeros((2, N))
 
     for i in range(N):
-        for j in graph.topological_neighbors(L, i):
+        for j in topological_neighbors(L, i):
             # Perform a weighted consensus to make the rectangular shape
             error = x[:2, j] - x[:2, i]
             dxi[:, i] += formation_control_gain*(np.power(np.linalg.norm(error), 2)- np.power(weights[i, j], 2)) * error
@@ -55,12 +58,9 @@ for k in range(iterations):
     dxi = si_barrier_cert(dxi, x[:2, :])
 
     # Transform the single-integrator dynamcis to unicycle dynamics
-    dxu = transformations.single_integrator_to_unicycle2(dxi, x)
+    dxu = si_to_uni_dyn(dxi, x)
 
     # Set the velocities of the robots
     r.set_velocities(np.arange(N), dxu)
     # Iterate the simulation
     r.step()
-
-# Always call this at the end of your scripts!! It will acccelerate your execution time.
-r.call_at_scripts_end()

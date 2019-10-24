@@ -18,7 +18,7 @@ options['reltol'] = 1e-2 # was e-2
 options['feastol'] = 1e-2 # was e-4
 options['maxiters'] = 50 # default is 100
 
-def create_single_integrator_barrier_certificate(barrier_gain=500, safety_radius=0.15, magnitude_limit=0.2):
+def create_single_integrator_barrier_certificate(barrier_gain=100, safety_radius=0.15, magnitude_limit=0.2):
     """Creates a barrier certificate for a single-integrator system.  This function
     returns another function for optimization reasons.
 
@@ -83,7 +83,7 @@ def create_single_integrator_barrier_certificate(barrier_gain=500, safety_radius
 
     return f
 
-def create_single_integrator_barrier_certificate_with_boundary(barrier_gain=500, safety_radius=0.15, magnitude_limit=0.2, boundary_points = np.array([-1.6, 1.6, -1.0, 1.0])):
+def create_single_integrator_barrier_certificate_with_boundary(barrier_gain=100, safety_radius=0.15, magnitude_limit=0.2, boundary_points = np.array([-1.6, 1.6, -1.0, 1.0])):
     """Creates a barrier certificate for a single-integrator system with a rectangular boundary included.  This function
     returns another function for optimization reasons.
 
@@ -172,7 +172,7 @@ def create_single_integrator_barrier_certificate_with_boundary(barrier_gain=500,
 
     return f
 
-def create_single_integrator_barrier_certificate2(barrier_gain=500, unsafe_barrier_gain=1e6, safety_radius=0.15, magnitude_limit=0.2):
+def create_single_integrator_barrier_certificate2(barrier_gain=100, unsafe_barrier_gain=1e6, safety_radius=0.15, magnitude_limit=0.2):
     """Creates a barrier certificate for a single-integrator system.  This function
     returns another function for optimization reasons. This function is different from 
     create_single_integrator_barrier_certificate as it changes the barrier gain to a large
@@ -244,7 +244,7 @@ def create_single_integrator_barrier_certificate2(barrier_gain=500, unsafe_barri
 
     return f
 
-def create_unicycle_barrier_certificate(barrier_gain=500, safety_radius=0.12, projection_distance=0.03, magnitude_limit=0.2):
+def create_unicycle_barrier_certificate(barrier_gain=100, safety_radius=0.12, projection_distance=0.03, magnitude_limit=0.2):
     """ Creates a unicycle barrier cetifcate to avoid collisions. Uses the diffeomorphism mapping
     and single integrator implementation. For optimization purposes, this function returns 
     another function.
@@ -297,7 +297,7 @@ def create_unicycle_barrier_certificate(barrier_gain=500, safety_radius=0.12, pr
 
     return f
 
-def create_unicycle_barrier_certificate_with_boundary(barrier_gain=500, safety_radius=0.12, projection_distance=0.03, magnitude_limit=0.2, boundary_points = np.array([-1.6, 1.6, -1.0, 1.0])):
+def create_unicycle_barrier_certificate_with_boundary(barrier_gain=100, safety_radius=0.12, projection_distance=0.03, magnitude_limit=0.2, boundary_points = np.array([-1.6, 1.6, -1.0, 1.0])):
     """ Creates a unicycle barrier cetifcate to avoid collisions. Uses the diffeomorphism mapping
     and single integrator implementation. For optimization purposes, this function returns 
     another function.
@@ -562,7 +562,7 @@ def create_unicycle_differential_drive_barrier_certificate_with_boundary(max_num
 
         for i in range(num_robots-1):
             for j in range(i+1, num_robots):
-                diff = ps[:, i] - ps[:, j]
+                diff = ps[:, [i]] - ps[:, [j]]
                 h = np.sum(np.square(diff),0) - safety_radius**2
                 h_dot_i = 2*diff.T.dot(Ms[:, ((2*i), (2*i+1))].dot(D))
                 h_dot_j = -2*diff.T.dot(Ms[:, ((2*j), (2*j+1))].dot(D))
@@ -586,22 +586,22 @@ def create_unicycle_differential_drive_barrier_certificate_with_boundary(max_num
         for k in range(num_robots):
             #Pos Y
             A[count, (2*k, 2*k+1)] = -Ms[1,(2*k,2*k+1)].dot(D)
-            b[count] = -0.4*barrier_gain*(boundary_points[3] - safety_radius/2 - ps[1,j])**3;
+            b[count] = -0.4*barrier_gain*(boundary_points[3] - safety_radius/2 - ps[1,k])**3;
             count += 1
 
             #Neg Y
             A[count, (2*k, 2*k+1)] = Ms[1,(2*k,2*k+1)].dot(D)
-            b[count] = -0.4*barrier_gain*(-boundary_points[2] - safety_radius/2 + ps[1,j])**3;
+            b[count] = -0.4*barrier_gain*(-boundary_points[2] - safety_radius/2 + ps[1,k])**3;
             count += 1
 
             #Pos X
             A[count, (2*k, 2*k+1)] = -Ms[0,(2*k,2*k+1)].dot(D)
-            b[count] = -0.4*barrier_gain*(boundary_points[1] - safety_radius/2 - ps[0,j])**3;
+            b[count] = -0.4*barrier_gain*(boundary_points[1] - safety_radius/2 - ps[0,k])**3;
             count += 1
 
             #Neg X
             A[count, (2*k, 2*k+1)] = Ms[0,(2*k,2*k+1)].dot(D)
-            b[count] = -0.4*barrier_gain*(-boundary_points[0] - safety_radius/2 + ps[0,j])**3;
+            b[count] = -0.4*barrier_gain*(-boundary_points[0] - safety_radius/2 + ps[0,k])**3;
             count += 1
 
         # Adding Upper Bounds On Wheels
@@ -619,11 +619,6 @@ def create_unicycle_differential_drive_barrier_certificate_with_boundary(max_num
         vhat = np.reshape(dxu ,(2*num_robots,1), order='F')
         H = 2*L_all.T.dot(L_all)
         f = -2*vhat.T.dot(L_all.T.dot(L_all))
-
-        print(H.shape)
-        print(f.shape)
-        print(A.shape)
-        print(b.shape)
 
         # Alternative Solver
         #start = time.time()

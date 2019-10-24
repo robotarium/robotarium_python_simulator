@@ -23,10 +23,6 @@ N=4 #Number of robots to use, this must stay 4 unless the Laplacian is changed.
 waypoints = np.array([[-1, -1, 1, 1],[0.8, -0.8, -0.8, 0.8]]) #Waypoints the leader moves to.
 close_enough = 0.03; #How close the leader must get to the waypoint to move to the next one.
 
-# Preallocate data saving
-robot_distance = np.zeros((5,iterations)) #Saving 4 inter-robot distances and time
-goal_distance = np.empty((0,2))
-
 # Create the desired Laplacian
 followers = -completeGL(N-1)
 L = np.zeros((N,N))
@@ -140,12 +136,6 @@ for t in range(iterations):
 
 	# Set the velocities of agents 1,...,N to dxu
 	r.set_velocities(np.arange(N), dxu)
-
-	# Compute data to be saved and stored in matrix
-	# Distance between connected robots
-	robot_distance[0,t] = np.linalg.norm(xi[:,[0]]-xi[:,[1]])
-	for j in range(1,int(len(rows)/2)+1):
-		robot_distance[j,t] = np.linalg.norm(xi[:,[rows[j]]]-xi[:,[cols[j]]])
 
 	# Iterate the simulation
 	r.step()
