@@ -10,8 +10,10 @@ import numpy as np
 N = 10
 # Instantiate the Robotarium object with these parameters
 r = robotarium.Robotarium(number_of_robots=N, show_figure=True, sim_in_real_time=True)
-# How many iterations do we want (about 165 seconds)
-iterations = 5000
+
+# How many times should the robots form the circle?
+num_cycles=2
+count = -1 # How many times have they formed the circle? (starts at -1 since initial formation will increment the count)
 
 # Barrier Parameters
 safety_radius = 0.15
@@ -43,7 +45,7 @@ flag = 0
 x_goal = p_circ[:, :N]
 
 # Perform the simulation for a certain number of iterations
-for k in range(iterations):
+while(1):
 
     # Get the poses of the agents that we want
     x = r.get_poses()
@@ -58,6 +60,10 @@ for k in range(iterations):
     # Check if all the agents are close enough to the goals
     if(np.linalg.norm(x_goal - x_si) < 0.05):
         flag = 1-flag
+        count += 1
+
+    if count == num_cycles:
+        break
 
     # Switch goals depending on the state of flag (goals switch to opposite
     # sides of the circle)
