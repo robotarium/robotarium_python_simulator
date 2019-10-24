@@ -16,7 +16,7 @@ AUTHOR = 'Paul Glotfelter'
 
 # What packages are required for this module to be executed?
 REQUIRED = [
-    'cvxopt', 'scipy', 'numpy', 'matplotlib',
+    'cvxopt', 'scipy', 'numpy', 'matplotlib', 'quadprog'
 ]
 
 # The rest you shouldn't have to touch too much :)
