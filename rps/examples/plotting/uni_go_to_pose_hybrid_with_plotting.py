@@ -13,7 +13,7 @@ initial_conditions = np.array(np.mat('1 0.5 -0.5 0 0.28; 0.8 -0.3 -0.75 0.1 0.34
 r = robotarium.Robotarium(number_of_robots=N, show_figure=True, initial_conditions=initial_conditions,sim_in_real_time=True)
 
 # Define goal points by removing orientation from poses
-goal_points = generate_initial_conditions(N)
+goal_points = generate_initial_conditions(N, width=r.boundaries[2]-2*r.robot_diameter, height = r.boundaries[3]-2*r.robot_diameter, spacing=0.5)
 
 # Create unicycle pose controller
 unicycle_pose_controller = create_hybrid_unicycle_pose_controller()
@@ -30,7 +30,7 @@ goal_marker_size_m = 0.2
 robot_marker_size_m = 0.15
 marker_size_goal = determine_marker_size(r,goal_marker_size_m)
 marker_size_robot = determine_marker_size(r, robot_marker_size_m)
-font_size = determine_font_size(r,0.05)
+font_size = determine_font_size(r,0.1)
 line_width = 5
 
 # Create Goal Point Markers

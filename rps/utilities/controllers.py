@@ -207,7 +207,7 @@ def create_hybrid_unicycle_pose_controller(linear_velocity_gain=1, angular_veloc
                 dxu[0,i] = 0
                 dxu[1,i] = angular_velocity_gain*wrapped
             else:
-                dxu[:,i] = np.zeros((2,1))
+                dxu[:,[i]] = np.zeros((2,1))
 
         return dxu
 
