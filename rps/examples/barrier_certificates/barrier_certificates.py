@@ -28,6 +28,7 @@ si_position_controller = create_si_position_controller()
 
 # Create SI to UNI dynamics tranformation
 si_to_uni_dyn, uni_to_si_states = create_si_to_uni_mapping(projection_distance=projection_distance)
+#si_to_uni_dyn = create_si_to_uni_dynamics()
 
 # This portion of the code generates points on a circle enscribed in a 6x6 square
 # that's centered on the origin.  The robots switch positions on the circle.
@@ -50,8 +51,7 @@ while(1):
     # Get the poses of the agents that we want
     x = r.get_poses()
 
-    # We're planning on using the single-integrator to unciycle mapping,
-    # so our single-integrator states are the projected point.
+    # To compare distances, only take the first two elements of our pose array.
     x_si = uni_to_si_states(x)
 
     # Initialize a velocities variable
@@ -86,3 +86,6 @@ while(1):
     r.set_velocities(np.arange(N), dxu)
     # Iterate the simulation
     r.step()
+
+#Call at end of script to print debug information and for your script to run on the Robotarium server properly
+r.call_at_scripts_end()

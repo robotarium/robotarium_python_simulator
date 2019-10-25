@@ -98,7 +98,7 @@ def create_si_to_uni_dynamics_with_backwards_motion(linear_velocity_gain=1, angu
 
     return si_to_uni_dyn
 
-def create_si_to_uni_mapping(projection_distance=0.03):
+def create_si_to_uni_mapping(projection_distance=0.03, angular_velocity_limit = np.pi):
     """Creates two functions for mapping from single integrator dynamics to 
     unicycle dynamics and unicycle states to single integrator states. 
     
@@ -106,16 +106,18 @@ def create_si_to_uni_mapping(projection_distance=0.03):
     the unicycle.
 
     projection_distance: How far ahead to place the point
+    angular_velocity_limit: The maximum angular velocity that can be provided
 
     -> (function, function)
     """
 
     #Check user input types
     assert isinstance(projection_distance, (int, float)), "In the function create_si_to_uni_mapping, the projection distance of the new control point (projection_distance) must be an integer or float. Recieved type %r." % type(projection_distance).__name__
+    assert isinstance(angular_velocity_limit, (int, float)), "In the function create_si_to_uni_mapping, the maximum angular velocity command (angular_velocity_limit) must be an integer or float. Recieved type %r." % type(angular_velocity_limit).__name__
     
     #Check user input ranges/sizes
     assert projection_distance > 0, "In the function create_si_to_uni_mapping, the projection distance of the new control point (projection_distance) must be positive. Recieved %r." % projection_distance
-    
+    assert projection_distance >= 0, "In the function create_si_to_uni_mapping, the maximum angular velocity command (angular_velocity_limit) must be greater than or equal to zero. Recieved %r." % angular_velocity_limit
 
     def si_to_uni_dyn(dxi, poses):
         """Takes single-integrator velocities and transforms them to unicycle
@@ -145,6 +147,10 @@ def create_si_to_uni_mapping(projection_distance=0.03):
         dxu = np.zeros((2, N))
         dxu[0, :] = (cs*dxi[0, :] + ss*dxi[1, :])
         dxu[1, :] = (1/projection_distance)*(-ss*dxi[0, :] + cs*dxi[1, :])
+
+        #Impose angular velocity cap.
+        dxu[1,dxu[1,:]>angular_velocity_limit] = angular_velocity_limit
+        dxu[1,dxu[1,:]<-angular_velocity_limit] = -angular_velocity_limit 
 
         return dxu
 
