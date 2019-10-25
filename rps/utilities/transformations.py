@@ -98,7 +98,7 @@ def create_si_to_uni_dynamics_with_backwards_motion(linear_velocity_gain=1, angu
 
     return si_to_uni_dyn
 
-def create_si_to_uni_mapping(projection_distance=0.03, angular_velocity_limit = np.pi):
+def create_si_to_uni_mapping(projection_distance=0.05, angular_velocity_limit = np.pi):
     """Creates two functions for mapping from single integrator dynamics to 
     unicycle dynamics and unicycle states to single integrator states. 
     
@@ -172,7 +172,7 @@ def create_si_to_uni_mapping(projection_distance=0.03, angular_velocity_limit = 
 
     return si_to_uni_dyn, uni_to_si_states
 
-def create_uni_to_si_dynamics(projection_distance=0.03):
+def create_uni_to_si_dynamics(projection_distance=0.05):
     """Creates two functions for mapping from unicycle dynamics to single 
     integrator dynamics and single integrator states to unicycle states. 
     

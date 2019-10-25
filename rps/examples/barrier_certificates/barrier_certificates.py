@@ -15,10 +15,6 @@ r = robotarium.Robotarium(number_of_robots=N, show_figure=True, sim_in_real_time
 num_cycles=2
 count = -1 # How many times have they formed the circle? (starts at -1 since initial formation will increment the count)
 
-# Barrier Parameters
-safety_radius = 0.15
-projection_distance = 0.03
-
 # We're working in single-integrator dynamics, and we don't want the robots
 # to collide.  Thus, we're going to use barrier certificates
 si_barrier_cert = create_single_integrator_barrier_certificate()
@@ -27,8 +23,7 @@ si_barrier_cert = create_single_integrator_barrier_certificate()
 si_position_controller = create_si_position_controller()
 
 # Create SI to UNI dynamics tranformation
-si_to_uni_dyn, uni_to_si_states = create_si_to_uni_mapping(projection_distance=projection_distance)
-#si_to_uni_dyn = create_si_to_uni_dynamics()
+si_to_uni_dyn, uni_to_si_states = create_si_to_uni_mapping()
 
 # This portion of the code generates points on a circle enscribed in a 6x6 square
 # that's centered on the origin.  The robots switch positions on the circle.

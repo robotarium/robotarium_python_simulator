@@ -23,6 +23,8 @@ single_integrator_position_controller = create_si_position_controller()
 #si_barrier_cert = create_single_integrator_barrier_certificate()
 si_barrier_cert = create_single_integrator_barrier_certificate_with_boundary()
 
+_, uni_to_si_states = create_si_to_uni_mapping()
+
 # Create mapping from single integrator velocity commands to unicycle velocity commands
 si_to_uni_dyn = create_si_to_uni_dynamics_with_backwards_motion()
 
@@ -36,7 +38,7 @@ while (np.size(at_pose(x, goal_points, rotation_error=100)) != N):
 
     # Get poses of agents
     x = r.get_poses()
-    x_si = x[:2][:]
+    x_si = uni_to_si_states(x)
 
     # Create single-integrator control inputs
     dxi = single_integrator_position_controller(x_si, goal_points[:2][:])

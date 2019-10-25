@@ -14,16 +14,12 @@ r = robotarium.Robotarium(number_of_robots=N, show_figure=True, sim_in_real_time
 # How many iterations do we want (about N*0.033 seconds)
 iterations = 1000
 
-# Barrier Parameters
-safety_radius = 0.15
-projection_distance = 0.03
-
 # We're working in single-integrator dynamics, and we don't want the robots
 # to collide or drive off the testbed.  Thus, we're going to use barrier certificates
 si_barrier_cert = create_single_integrator_barrier_certificate_with_boundary()
 
 # Create SI to UNI dynamics tranformation
-si_to_uni_dyn, uni_to_si_states = create_si_to_uni_mapping(projection_distance=projection_distance)
+si_to_uni_dyn, uni_to_si_states = create_si_to_uni_mapping()
 
 # Generated a connected graph Laplacian (for a cylce graph).
 L = cycle_GL(N)
