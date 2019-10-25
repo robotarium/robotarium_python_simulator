@@ -22,7 +22,7 @@ import numpy as np
 import time
 
 # Experiment Constants
-iterations = 1000 #Run the simulation/experiment for 5000 steps (5000*0.033 ~= 2min 45sec)
+iterations = 5000 #Run the simulation/experiment for 5000 steps (5000*0.033 ~= 2min 45sec)
 N=4 #Number of robots to use, this must stay 4 unless the Laplacian is changed.
 
 waypoints = np.array([[-1, -1, 1, 1],[0.8, -0.8, -0.8, 0.8]]) #Waypoints the leader moves to.
