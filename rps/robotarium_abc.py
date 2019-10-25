@@ -46,6 +46,7 @@ class RobotariumABC(ABC):
         self.base_length = 0.105
         self.max_linear_velocity = 0.2
         self.max_angular_velocity = 2*(self.wheel_radius/self.robot_diameter)*(self.max_linear_velocity/self.wheel_radius)
+        self.max_wheel_velocity = self.max_linear_velocity/self.wheel_radius
 
         self.robot_radius = self.robot_diameter/2
 
@@ -128,3 +129,67 @@ class RobotariumABC(ABC):
     @abstractmethod
     def step(self):
         raise NotImplementedError()
+
+    #Protected Functions
+    def _threshold(self, dxu):
+        dxdd = self._uni_to_diff(dxu)
+
+        to_thresh = np.absolute(dxdd) > self.max_wheel_velocity
+        dxdd[to_thresh] = self.max_wheel_velocity*np.sign(dxdd[to_thresh])
+
+        dxu = self._diff_to_uni(dxdd)
+
+    def _uni_to_diff(self, dxu):
+        r = self.wheel_radius
+        l = self.base_length
+        dxdd = np.vstack((1/(2*r)*(2*dxu[0,:]-l*dxu[1,:]),1/(2*r)*(2*dxu[0,:]+l*dxu[1,:])))
+
+        return dxdd
+
+    def _diff_to_uni(self, dxdd):
+        r = self.wheel_radius
+        l = self.base_length
+        dxu = np.vstack((r/(2)*(dxdd[0,:]+dxdd[1,:]),r/l*(dxdd[1,:]-dxdd[0,:])))
+
+        return dxu
+
+    def _validate(self, errors = {}):
+        # This is meant to be called on every iteration of step.
+        # Checks to make sure robots are operating within the bounds of reality.
+
+        p = self.poses
+        b = self.boundaries
+        N = self.number_of_robots
+
+
+        for i in range(N):
+            x = p[0,i]
+            y = p[1,i]
+
+            if(x < b[0] or x > (b[0] + b[2]) or y < b[1] or y > (b[1] + b[3])):
+                    if "boundary" in errors:
+                        errors["boundary"] += 1
+                    else:
+                        errors["boundary"] = 1
+                        errors["boundary_string"] = "iteration(s) robots were outside the boundaries."
+
+        for j in range(N-1):
+            for k in range(j+1,N):
+                if(np.linalg.norm(p[:2,j]-p[:2,k]) <= self.robot_diameter):
+                    if "collision" in errors:
+                        errors["collision"] += 1
+                    else:
+                        errors["collision"] = 1
+                        errors["collision_string"] = "iteration(s) where robots collided."
+
+        dxdd = self._uni_to_diff(self.velocities)
+        exceeding = np.absolute(dxdd) > self.max_wheel_velocity
+        if(np.any(exceeding)):
+            if "actuator" in errors:
+                errors["actuator"] += 1
+            else:
+                errors["actuator"] = 1
+                errors["actuator_string"] = "iteration(s) where the actuator limits were exceeded."
+
+        return errors
+

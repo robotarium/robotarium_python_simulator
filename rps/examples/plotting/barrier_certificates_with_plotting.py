@@ -23,11 +23,11 @@ safety_radius = 0.17
 CM = np.random.rand(N,3) # Random Colors
 safety_radius_marker_size = determine_marker_size(r,safety_radius) # Will scale the plotted markers to be the diameter of provided argument (in meters)
 font_height_meters = 0.1
-font_height_pixels = determine_font_size(r,font_height_meters) # Will scale the plotted font height to that of the provided argument (in meters)
+font_height_points = determine_font_size(r,font_height_meters) # Will scale the plotted font height to that of the provided argument (in meters)
 
 # Initial plots
 x=r.get_poses()
-g = r.axes.scatter(x[0,:], x[1,:], s=safety_radius_marker_size, marker='o', facecolors='none',edgecolors=CM,linewidth=7)
+g = r.axes.scatter(x[0,:], x[1,:], s=np.pi/4*safety_radius_marker_size, marker='o', facecolors='none',edgecolors=CM,linewidth=7)
 #g = r.axes.plot(x[0,:], x[1,:], markersize=safety_radius_marker_size, linestyle='none', marker='o', markerfacecolor='none', markeredgecolor=color[CM],linewidth=7)
 r.step()
 
@@ -105,7 +105,7 @@ while(1):
     r.step()
 
 finished_caption = "All robots safely reached \n their destination"
-finished_label = plt.text(0,0,finished_caption,fontsize=font_height_pixels, color='k',fontweight='bold',horizontalalignment='center',verticalalignment='center',zorder=20)
+finished_label = plt.text(0,0,finished_caption,fontsize=font_height_points, color='k',fontweight='bold',horizontalalignment='center',verticalalignment='center',zorder=20)
 r.step()
 time.sleep(5)
 

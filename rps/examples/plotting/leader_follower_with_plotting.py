@@ -64,7 +64,8 @@ leader_controller = create_si_position_controller(velocity_magnitude_limit=0.1)
 # Plotting Parameters
 CM = np.random.rand(N,3) # Random Colors
 marker_size_goal = determine_marker_size(r,0.2)
-font_size = determine_font_size(r,0.1)
+font_size_m = 0.1
+font_size = determine_font_size(r,font_size_m)
 line_width = 5
 
 # Create goal text and markers
@@ -103,16 +104,16 @@ for t in range(iterations):
 	# Update Plot Handles
 	for q in range(N-1):
 		follower_labels[q].set_position([xi[0,q+1],xi[1,q+1]+0.15])
-		follower_labels[q].set_fontsize(determine_font_size(r,0.05))
+		follower_labels[q].set_fontsize(determine_font_size(r,font_size_m))
 		line_follower[q][0].set_data([x[0,rows[q+1]], x[0,cols[q+1]]],[x[1,rows[q+1]], x[1,cols[q+1]]])
 	leader_label.set_position([xi[0,0],xi[1,0]+0.15])
-	leader_label.set_fontsize(determine_font_size(r,0.05))
+	leader_label.set_fontsize(determine_font_size(r,font_size_m))
 	line_leader[0].set_data([x[0,0],x[0,1]],[x[1,0],x[1,1]])
 
 	# This updates the marker sizes if the figure window size is changed. 
     # This should be removed when submitting to the Robotarium.
 	for q in range(waypoints.shape[1]):
-		waypoint_text[q].set_fontsize(determine_font_size(r,0.05))
+		waypoint_text[q].set_fontsize(determine_font_size(r,font_size_m))
 		g[q].set_sizes([determine_marker_size(r,0.2)])
 
 	#Algorithm

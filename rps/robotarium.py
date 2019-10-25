@@ -24,7 +24,10 @@ class Robotarium(RobotariumABC):
             self._checked_poses_already = False
 
             #Initialization of error collection.
-            self.errors = {} 
+            self._errors = {}
+
+            #Initialize steps
+            self._iterations = 0 
 
         def get_poses(self):
             """Returns the states of the agents.
@@ -40,10 +43,23 @@ class Robotarium(RobotariumABC):
             return self.poses
 
         def call_at_scripts_end(self):
-            """Call this function at the end of scripts to write data.  Even if you
-            don't write any data, calling this function at the end of your script will
-            accelerate execution on the server.
+            """Call this function at the end of scripts to display potentail errors.  
+            Even if you don't want to print the errors, calling this function at the
+            end of your script will enable execution on the Robotarium testbed.
             """
+            print('##### DEBUG OUTPUT #####')
+            print('Your simulation will take approximately {0} real seconds when deployed on the Robotarium. \n'.format(math.ceil(self._iterations*0.033)))
+
+            if bool(self._errors):
+                if "boundary" in self._errors:
+                    print('\t Simulation had {0} {1}\n'.format(self._errors["boundary"], self._errors["boundary_string"]))
+                if "collision" in self._errors:
+                    print('\t Simulation had {0} {1}\n'.format(self._errors["collision"], self._errors["collision_string"]))
+                if "actuator" in self._errors:
+                    print('\t Simulation had {0} {1}'.format(self._errors["actuator"], self._errors["actuator_string"]))
+            else:
+                print('No errors in your simulation! Acceptance of your experiment is likely!')
+
             return
 
         def step(self):
@@ -54,6 +70,11 @@ class Robotarium(RobotariumABC):
             # Allow get_poses function to be called again.
             self._called_step_already = True
             self._checked_poses_already = False
+
+            # Validate before thresholding velocities
+            self._errors = self._validate()
+            self._iterations += 1
+
 
             # Update dynamics of agents
             self.poses[0, :] = self.poses[0, :] + self.time_step*np.cos(self.poses[2,:])*self.velocities[0, :]

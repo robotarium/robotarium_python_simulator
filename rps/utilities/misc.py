@@ -119,11 +119,10 @@ def determine_marker_size(robotarium_instance, marker_size_meters):
 def determine_font_size(robotarium_instance, font_height_meters):
 
 	# Get the x and y dimension of the robotarium figure window in pixels
-	fig_dim_pixels = robotarium_instance.axes.transData.transform(np.array([[robotarium_instance.boundaries[2]],[robotarium_instance.boundaries[3]]]))
+	y1, y2 = robotarium_instance.axes.get_window_extent().get_points()[:,1]
 
 	# Determine the ratio of the robot size to the y-axis.
-	font_ratio = (font_height_meters)/(robotarium_instance.boundaries[3])
+	font_ratio = (y2-y1)/(robotarium_instance.boundaries[2])
 
-	# Determine the marker size in points so it fits the window. Note: This is squared
-	# as marker sizes are areas.
-	return (fig_dim_pixels[0,1] * font_ratio)
+	# Determine the font size in points so it fits the window.
+	return (font_ratio*font_height_meters)
