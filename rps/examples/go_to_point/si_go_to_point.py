@@ -30,11 +30,12 @@ si_to_uni_dyn = create_si_to_uni_dynamics_with_backwards_motion()
 
 # define x initially
 x = r.get_poses()
+x_si = uni_to_si_states(x)
 r.step()
 
 # While the number of robots at the required poses is less
 # than N...
-while (np.size(at_pose(x, goal_points, rotation_error=100)) != N):
+while (np.size(at_pose(np.vstack((x_si,x[2,:])), goal_points, rotation_error=100)) != N):
 
     # Get poses of agents
     x = r.get_poses()

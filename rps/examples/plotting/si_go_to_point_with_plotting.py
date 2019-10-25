@@ -14,7 +14,7 @@ initial_conditions = np.array(np.mat('1 0.5 -0.5 0 0.28; 0.8 -0.3 -0.75 0.1 0.34
 r = robotarium.Robotarium(number_of_robots=N, show_figure=True, initial_conditions=initial_conditions, sim_in_real_time=False)
 
 # Define goal points by removing orientation from poses
-goal_points = generate_initial_conditions(N)
+goal_points = generate_initial_conditions(N, width=r.boundaries[2]-2*r.robot_diameter, height = r.boundaries[3]-2*r.robot_diameter, spacing=0.5)
 
 # Create single integrator position controller
 single_integrator_position_controller = create_si_position_controller()
@@ -30,6 +30,7 @@ si_to_uni_dyn = create_si_to_uni_dynamics_with_backwards_motion()
 
 # define x initially
 x = r.get_poses()
+x_si = uni_to_si_states(x)
 
 # Plotting Parameters
 CM = np.random.rand(N,3) # Random Colors
@@ -57,7 +58,7 @@ r.step()
 
 # While the number of robots at the required poses is less
 # than N...
-while (np.size(at_pose(x, goal_points, rotation_error=100)) != N):
+while (np.size(at_pose(np.vstack((x_si,x[2,:])), goal_points, rotation_error=100)) != N):
 
     # Get poses of agents
     x = r.get_poses()
