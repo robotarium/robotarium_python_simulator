@@ -36,10 +36,13 @@ line_width = 5
 # Create Goal Point Markers
 #Text with goal identification
 goal_caption = ['G{0}'.format(ii) for ii in range(goal_points.shape[1])]
-#Plot text for caption
-goal_points_text = [plt.text(goal_points[0,ii], goal_points[1,ii], goal_caption[ii], fontsize=font_size, color='k',fontweight='bold',horizontalalignment='center',verticalalignment='center',zorder=-2)
+#Arrow for desired orientation
+goal_orientation_arrows = [r.axes.arrow(goal_points[0,ii], goal_points[1,ii], goal_marker_size_m*np.cos(goal_points[2,ii]), goal_marker_size_m*np.sin(goal_points[2,ii]), width = 0.05, length_includes_head=True, color = CM[ii,:], zorder=-2)
 for ii in range(goal_points.shape[1])]
-goal_markers = [r.axes.scatter(goal_points[0,ii], goal_points[1,ii], s=marker_size_goal, marker='s', facecolors='none',edgecolors=CM[ii,:],linewidth=line_width,zorder=-2)
+#Plot text for caption
+goal_points_text = [r.axes.text(goal_points[0,ii], goal_points[1,ii], goal_caption[ii], fontsize=font_size, color='k',fontweight='bold',horizontalalignment='center',verticalalignment='center',zorder=-3)
+for ii in range(goal_points.shape[1])]
+goal_markers = [r.axes.scatter(goal_points[0,ii], goal_points[1,ii], s=marker_size_goal, marker='s', facecolors='none',edgecolors=CM[ii,:],linewidth=line_width,zorder=-3)
 for ii in range(goal_points.shape[1])]
 robot_markers = [r.axes.scatter(x[0,ii], x[1,ii], s=marker_size_robot, marker='o', facecolors='none',edgecolors=CM[ii,:],linewidth=line_width) 
 for ii in range(goal_points.shape[1])]
