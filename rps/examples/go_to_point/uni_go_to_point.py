@@ -43,3 +43,6 @@ while (np.size(at_pose(x, goal_points, rotation_error=100)) != N):
 
     # Iterate the simulation
     r.step()
+
+#Call at end of script to print debug information and for your script to run on the Robotarium server properly
+r.call_at_scripts_end()

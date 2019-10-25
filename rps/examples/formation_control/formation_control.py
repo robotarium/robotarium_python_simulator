@@ -36,6 +36,9 @@ weights = np.array([
 iterations = 2000
 N = 6
 
+#Limit maximum linear speed of any robot
+magnitude_limit = 0.15
+
 r = robotarium.Robotarium(number_of_robots=N, show_figure=True, sim_in_real_time=True)
 si_barrier_cert = create_single_integrator_barrier_certificate_with_boundary()
 si_to_uni_dyn = create_si_to_uni_dynamics()
@@ -54,6 +57,12 @@ for k in range(iterations):
             error = x[:2, j] - x[:2, i]
             dxi[:, i] += formation_control_gain*(np.power(np.linalg.norm(error), 2)- np.power(weights[i, j], 2)) * error
 
+    #Keep single integrator control vectors under specified magnitude
+    # Threshold control inputs
+    norms = np.linalg.norm(dxi, 2, 0)
+    idxs_to_normalize = (norms > magnitude_limit)
+    dxi[:, idxs_to_normalize] *= magnitude_limit/norms[idxs_to_normalize]
+
     # Make sure that the robots don't collide
     dxi = si_barrier_cert(dxi, x[:2, :])
 
@@ -64,3 +73,6 @@ for k in range(iterations):
     r.set_velocities(np.arange(N), dxu)
     # Iterate the simulation
     r.step()
+
+#Call at end of script to print debug information and for your script to run on the Robotarium server properly
+r.call_at_scripts_end()

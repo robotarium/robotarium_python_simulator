@@ -53,3 +53,6 @@ for i in range(iterations):
 
     # Iterate the simulation
     r.step()
+
+#Call at end of script to print debug information and for your script to run on the Robotarium server properly
+r.call_at_scripts_end()

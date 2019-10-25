@@ -22,7 +22,7 @@ safety_radius = 0.17
 # Plotting Parameters
 CM = np.random.rand(N,3) # Random Colors
 safety_radius_marker_size = determine_marker_size(r,safety_radius) # Will scale the plotted markers to be the diameter of provided argument (in meters)
-font_height_meters = 0.05
+font_height_meters = 0.1
 font_height_pixels = determine_font_size(r,font_height_meters) # Will scale the plotted font height to that of the provided argument (in meters)
 
 # Initial plots
@@ -108,3 +108,6 @@ finished_caption = "All robots safely reached \n their destination"
 finished_label = plt.text(0,0,finished_caption,fontsize=font_height_pixels, color='k',fontweight='bold',horizontalalignment='center',verticalalignment='center',zorder=20)
 r.step()
 time.sleep(5)
+
+#Call at end of script to print debug information and for your script to run on the Robotarium server properly
+r.call_at_scripts_end()

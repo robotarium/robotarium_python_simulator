@@ -39,6 +39,9 @@ dxi = np.zeros((2,N))
 #Initialize leader state
 state = 0
 
+#Limit maximum linear speed of any robot
+magnitude_limit = 0.15
+
 # Create gains for our formation control algorithm
 formation_control_gain = 10
 desired_distance = 0.3
@@ -130,6 +133,12 @@ for t in range(iterations):
 	if np.linalg.norm(x[:2,[0]] - waypoint) < close_enough:
 		state = (state + 1)%4
 
+	#Keep single integrator control vectors under specified magnitude
+	# Threshold control inputs
+	norms = np.linalg.norm(dxi, 2, 0)
+	idxs_to_normalize = (norms > magnitude_limit)
+	dxi[:, idxs_to_normalize] *= magnitude_limit/norms[idxs_to_normalize]
+
 	#Use barriers and convert single-integrator to unicycle commands
 	dxi = si_barrier_cert(dxi, x[:2,:])
 	dxu = si_to_uni_dyn(dxi,x)
@@ -139,3 +148,6 @@ for t in range(iterations):
 
 	# Iterate the simulation
 	r.step()
+
+#Call at end of script to print debug information and for your script to run on the Robotarium server properly
+r.call_at_scripts_end()
