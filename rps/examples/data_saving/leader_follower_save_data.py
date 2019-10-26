@@ -125,8 +125,8 @@ np.save('goal_distance_data', goal_distance)
 np.save('inter_robot_distance_data', robot_distance)
 
 #Save Data Locally as CSV Text File
-np.savetxt('goal_distance_data', goal_distance, delimiter=',')
-np.savetxt('inter_robot_distance_data', robot_distance.T, delimiter=',')
+np.savetxt('goal_distance_data.txt', goal_distance, delimiter=',')
+np.savetxt('inter_robot_distance_data.txt', robot_distance.T, delimiter=',')
 
 #Call at end of script to print debug information and for your script to run on the Robotarium server properly
 r.call_at_scripts_end()
