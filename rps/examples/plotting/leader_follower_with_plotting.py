@@ -55,11 +55,11 @@ r = robotarium.Robotarium(number_of_robots=N, show_figure=True, initial_conditio
 # Grab Robotarium tools to do simgle-integrator to unicycle conversions and collision avoidance
 # Single-integrator -> unicycle dynamics mapping
 _,uni_to_si_states = create_si_to_uni_mapping()
-si_to_uni_dyn = create_si_to_uni_dynamics()
+si_to_uni_dyn = create_si_to_uni_dynamics(angular_velocity_limit=np.pi/2)
 # Single-integrator barrier certificates
 si_barrier_cert = create_single_integrator_barrier_certificate_with_boundary()
 # Single-integrator position controller
-leader_controller = create_si_position_controller(velocity_magnitude_limit=0.1)
+leader_controller = create_si_position_controller(velocity_magnitude_limit=0.15)
 
 # Plotting Parameters
 CM = np.random.rand(N,3) # Random Colors

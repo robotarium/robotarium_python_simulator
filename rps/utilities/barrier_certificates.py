@@ -3,7 +3,8 @@ from cvxopt.blas import dot
 from cvxopt.solvers import qp, options
 from cvxopt import matrix, sparse
 
-import quadprog as solver2
+# Unused for now, will include later for speed.
+# import quadprog as solver2
 
 import itertools
 import numpy as np
