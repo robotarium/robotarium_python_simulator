@@ -73,7 +73,7 @@ line_width = 5
 #Text with goal identification
 goal_caption = ['G{0}'.format(ii) for ii in range(waypoints.shape[1])]
 #Plot text for caption
-waypoint_text = [plt.text(waypoints[0,ii], waypoints[1,ii], goal_caption[ii], fontsize=font_size, color='k',fontweight='bold',horizontalalignment='center',verticalalignment='center',zorder=-2)
+waypoint_text = [r.axes.text(waypoints[0,ii], waypoints[1,ii], goal_caption[ii], fontsize=font_size, color='k',fontweight='bold',horizontalalignment='center',verticalalignment='center',zorder=-2)
 for ii in range(waypoints.shape[1])]
 g = [r.axes.scatter(waypoints[0,ii], waypoints[1,ii], s=marker_size_goal, marker='s', facecolors='none',edgecolors=CM[ii,:],linewidth=line_width,zorder=-2)
 for ii in range(waypoints.shape[1])]

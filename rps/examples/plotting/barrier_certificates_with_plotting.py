@@ -105,7 +105,7 @@ while(1):
     r.step()
 
 finished_caption = "All robots safely reached \n their destination"
-finished_label = plt.text(0,0,finished_caption,fontsize=font_height_points, color='k',fontweight='bold',horizontalalignment='center',verticalalignment='center',zorder=20)
+finished_label = r.axes.text(0,0,finished_caption,fontsize=font_height_points, color='k',fontweight='bold',horizontalalignment='center',verticalalignment='center',zorder=20)
 r.step()
 time.sleep(5)
 
