@@ -11,12 +11,12 @@ from setuptools import find_packages, setup, Command
 NAME = 'robotarium_python_simulator'
 DESCRIPTION = 'A Python-based simulator for the Robotarium.'
 URL = 'https://github.com/robotarium/robotarium_python_simulator'
-EMAIL = 'paul.glotfelter@gatech.edu'
-AUTHOR = 'Paul Glotfelter'
+EMAIL = 'Sean.T.Wilson@gatech.edu'
+AUTHOR = 'Sean Wilson and Paul Glotfelter'
 
 # What packages are required for this module to be executed?
 REQUIRED = [
-    'cvxopt', 'scipy', 'numpy', 'matplotlib', 'quadprog'
+    'cvxopt', 'scipy', 'numpy', 'matplotlib'
 ]
 
 # The rest you shouldn't have to touch too much :)

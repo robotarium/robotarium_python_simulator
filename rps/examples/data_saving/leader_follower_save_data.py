@@ -60,7 +60,7 @@ desired_distance = 0.3
 initial_conditions = np.array([[0, 0.5, 0.3, -0.1],[0.5, 0.5, 0.2, 0],[0, 0, 0, 0]])
 
 # Instantiate the Robotarium object with these parameters
-r = robotarium.Robotarium(number_of_robots=N, show_figure=True, initial_conditions=initial_conditions, sim_in_real_time=True)
+r = robotarium.Robotarium(number_of_robots=N, show_figure=True, initial_conditions=initial_conditions, sim_in_real_time=False)
 
 # Grab Robotarium tools to do simgle-integrator to unicycle conversions and collision avoidance
 # Single-integrator -> unicycle dynamics mapping
@@ -125,8 +125,8 @@ np.save('goal_distance_data', goal_distance)
 np.save('inter_robot_distance_data', robot_distance)
 
 #Save Data Locally as CSV Text File
-np.savetxt('goal_distance_data', goal_distance, delimiter=',')
-np.savetxt('inter_robot_distance_data', robot_distance.T, delimiter=',')
+np.savetxt('goal_distance_data.txt', goal_distance, delimiter=',')
+np.savetxt('inter_robot_distance_data.txt', robot_distance.T, delimiter=',')
 
 #Call at end of script to print debug information and for your script to run on the Robotarium server properly
 r.call_at_scripts_end()
