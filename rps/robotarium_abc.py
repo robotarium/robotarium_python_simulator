@@ -49,6 +49,8 @@ class RobotariumABC(ABC):
         self.max_wheel_velocity = self.max_linear_velocity/self.wheel_radius
 
         self.robot_radius = self.robot_diameter/2
+        self.collision_offset = 0.0325
+
 
         self.velocities = np.zeros((2, number_of_robots))
         self.poses = self.initial_conditions
@@ -66,14 +68,15 @@ class RobotariumABC(ABC):
         self.chassis_patches = []
         self.right_wheel_patches = []
         self.left_wheel_patches = []
+        self.chassis_patches2 = []
 
         if(self.show_figure):
             self.figure, self.axes = plt.subplots()
             self.axes.set_axis_off()
             for i in range(number_of_robots):
                 p = patches.RegularPolygon(self.poses[:2, i], 4, math.sqrt(2)*self.robot_radius, self.poses[2,i]+math.pi/4, facecolor='#FFD700', edgecolor = 'k')
-                rled = patches.Circle(self.poses[:2, i]+0.75*self.robot_radius*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i]))+\
-                                        0.04*np.array((-np.sin(self.poses[2, i]+math.pi/2), np.cos(self.poses[2, i]+math.pi/2)))),\
+                s = patches.Ellipse(self.poses[:2, i]+self.robot_radius*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i]))), width=self.robot_diameter, height=0.04, facecolor='#FFD700', edgecolor = 'k', zorder=0)
+                rled = patches.Circle(self.poses[:2, i]+0.75*self.robot_radius*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i]))+0.04*np.array((-np.sin(self.poses[2, i]+math.pi/2), np.cos(self.poses[2, i]+math.pi/2)))),
                                        self.robot_radius/5, fill=False)
                 lled = patches.Circle(self.poses[:2, i]+0.75*self.robot_radius*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i]))+\
                                         0.015*np.array((-np.sin(self.poses[2, i]+math.pi/2), np.cos(self.poses[2, i]+math.pi/2)))),\
@@ -89,6 +92,7 @@ class RobotariumABC(ABC):
                 #                                4, math.sqrt(2)*0.02, self.poses[2,i]+math.pi/4, facecolor='k')
 
                 self.chassis_patches.append(p)
+                self.chassis_patches2.append(s)
                 self.left_led_patches.append(lled)
                 self.right_led_patches.append(rled)
                 self.right_wheel_patches.append(rw)
@@ -97,6 +101,7 @@ class RobotariumABC(ABC):
                 self.axes.add_patch(rw)
                 self.axes.add_patch(lw)
                 self.axes.add_patch(p)
+                self.axes.add_patch(s)
                 self.axes.add_patch(lled)
                 self.axes.add_patch(rled)
 
@@ -175,7 +180,7 @@ class RobotariumABC(ABC):
 
         for j in range(N-1):
             for k in range(j+1,N):
-                if(np.linalg.norm(p[:2,j]-p[:2,k]) <= self.robot_diameter):
+                if(np.linalg.norm((p[:2,j] + self.collision_offset*np.array([np.cos(p[2]), np.sin(p[2])]))-(p[:2,k] + self.collision_offset*np.array([np.cos(p[2]), np.sin(p[2])]))) <= self.robot_radius):
                     if "collision" in errors:
                         errors["collision"] += 1
                     else:
