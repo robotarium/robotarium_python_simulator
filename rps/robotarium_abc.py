@@ -49,7 +49,9 @@ class RobotariumABC(ABC):
         self.max_wheel_velocity = self.max_linear_velocity/self.wheel_radius
 
         self.robot_radius = self.robot_diameter/2
-        self.collision_offset = 0.0325
+
+        self.collision_offset = 0.0125
+        self.collision_multiplier = 1.3
 
 
         self.velocities = np.zeros((2, number_of_robots))
@@ -177,9 +179,13 @@ class RobotariumABC(ABC):
 
         for j in range(N-1):
             for k in range(j+1,N):
-                if(np.linalg.norm((p[:2,j] + self.collision_offset*np.array([np.cos(p[2, j]), np.sin(p[2, j])]))-(p[:2,k] + self.collision_offset*np.array([np.cos(p[2, k]), np.sin(p[2, k])]))) <= self.robot_diameter):
+                first_position = p[:2, j] + self.collision_offset*np.array([np.cos(p[2,j]), np.sin(p[2, j])])
+                second_position = p[:2, k] + self.collision_offset*np.array([np.cos(p[2,k]), np.sin(p[2, k])])
+                if(np.linalg.norm(first_position - second_position) <= (self.robot_diameter*self.collision_multiplier)):
+                # if (np.linalg.norm(p[:2,j]-p[:2,k]) <= self.robot_diameter):
                     if "collision" in errors:
                         errors["collision"] += 1
+                        print("================Robots collided================")
                     else:
                         errors["collision"] = 1
                         errors["collision_string"] = "iteration(s) where robots collided."

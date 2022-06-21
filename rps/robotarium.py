@@ -66,7 +66,7 @@ class Robotarium(RobotariumABC):
             """Increments the simulation by updating the dynamics.
             """
             assert(not self._called_step_already), "Make sure to call get_poses before calling step() again."
-
+            # input(f"Iterations: {self._iterations}, Press Enter to continue...\n")
             # Allow get_poses function to be called again.
             self._called_step_already = True
             self._checked_poses_already = False
@@ -94,7 +94,7 @@ class Robotarium(RobotariumABC):
                 for i in range(self.number_of_robots):
                     self.chassis_patches[i].center = self.poses[:2, i]
                     self.chassis_patches[i].orientation = self.poses[2, i] + math.pi/4
-                    
+
                     self.right_wheel_patches[i].center = self.poses[:2, i]+self.robot_radius*np.array((np.cos(self.poses[2, i]+math.pi/2), np.sin(self.poses[2, i]+math.pi/2)))+\
                                             0.04*np.array((-np.sin(self.poses[2, i]+math.pi/2), np.cos(self.poses[2, i]+math.pi/2)))
                     self.right_wheel_patches[i].orientation = self.poses[2, i] + math.pi/4
