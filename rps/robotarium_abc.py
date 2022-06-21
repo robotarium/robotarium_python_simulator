@@ -177,7 +177,7 @@ class RobotariumABC(ABC):
 
         for j in range(N-1):
             for k in range(j+1,N):
-                if(np.linalg.norm((p[:2,j] + self.collision_offset*np.array([np.cos(p[2, j]), np.sin(p[2, j])]))-(p[:2,k] + self.collision_offset*np.array([np.cos(p[2, k]), np.sin(p[2, k])]))) <= self.robot_radius):
+                if(np.linalg.norm((p[:2,j] + self.collision_offset*np.array([np.cos(p[2, j]), np.sin(p[2, j])]))-(p[:2,k] + self.collision_offset*np.array([np.cos(p[2, k]), np.sin(p[2, k])]))) <= self.robot_diameter):
                     if "collision" in errors:
                         errors["collision"] += 1
                     else:
