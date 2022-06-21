@@ -68,14 +68,13 @@ class RobotariumABC(ABC):
         self.chassis_patches = []
         self.right_wheel_patches = []
         self.left_wheel_patches = []
-        # self.chassis_patches2 = []
 
         if(self.show_figure):
             self.figure, self.axes = plt.subplots()
             self.axes.set_axis_off()
             for i in range(number_of_robots):
                 p = patches.RegularPolygon(self.poses[:2, i], 4, math.sqrt(2)*self.robot_radius, self.poses[2,i]+math.pi/4, facecolor='#FFD700', edgecolor = 'k')
-                # s = patches.Ellipse(self.poses[:2, i]+self.robot_radius*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i]))), width=self.robot_diameter, height=0.04, facecolor='#FFD700', edgecolor = 'k', zorder=0)
+
                 rled = patches.Circle(self.poses[:2, i]+0.75*self.robot_radius*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i]))+0.04*np.array((-np.sin(self.poses[2, i]+math.pi/2), np.cos(self.poses[2, i]+math.pi/2)))),
                                        self.robot_radius/5, fill=False)
                 lled = patches.Circle(self.poses[:2, i]+0.75*self.robot_radius*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i]))+\
@@ -92,7 +91,6 @@ class RobotariumABC(ABC):
                 #                                4, math.sqrt(2)*0.02, self.poses[2,i]+math.pi/4, facecolor='k')
 
                 self.chassis_patches.append(p)
-                # self.chassis_patches2.append(s)
                 self.left_led_patches.append(lled)
                 self.right_led_patches.append(rled)
                 self.right_wheel_patches.append(rw)
@@ -101,7 +99,6 @@ class RobotariumABC(ABC):
                 self.axes.add_patch(rw)
                 self.axes.add_patch(lw)
                 self.axes.add_patch(p)
-                # self.axes.add_patch(s)
                 self.axes.add_patch(lled)
                 self.axes.add_patch(rled)
 

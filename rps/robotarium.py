@@ -94,10 +94,7 @@ class Robotarium(RobotariumABC):
                 for i in range(self.number_of_robots):
                     self.chassis_patches[i].center = self.poses[:2, i]
                     self.chassis_patches[i].orientation = self.poses[2, i] + math.pi/4
-
-                    # self.chassis_patches2[i].center = self.poses[:2, i]+self.robot_radius*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i])))
-                    # self.chassis_patches2[i]._angle = (self.poses[2, i] + math.pi/2)*180/math.pi
-
+                    
                     self.right_wheel_patches[i].center = self.poses[:2, i]+self.robot_radius*np.array((np.cos(self.poses[2, i]+math.pi/2), np.sin(self.poses[2, i]+math.pi/2)))+\
                                             0.04*np.array((-np.sin(self.poses[2, i]+math.pi/2), np.cos(self.poses[2, i]+math.pi/2)))
                     self.right_wheel_patches[i].orientation = self.poses[2, i] + math.pi/4
