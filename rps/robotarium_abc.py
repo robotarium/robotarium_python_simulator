@@ -50,8 +50,8 @@ class RobotariumABC(ABC):
 
         self.robot_radius = self.robot_diameter/2
 
-        self.collision_offset = 0.0125
-        self.collision_multiplier = 1.3
+        self.collision_offset = 0.0325
+        self.collision_multiplier = 1.06
 
 
         self.velocities = np.zeros((2, number_of_robots))
@@ -185,7 +185,7 @@ class RobotariumABC(ABC):
                 # if (np.linalg.norm(p[:2,j]-p[:2,k]) <= self.robot_diameter):
                     if "collision" in errors:
                         errors["collision"] += 1
-                        print("================Robots collided================")
+                        # print("================Robots collided================")
                     else:
                         errors["collision"] = 1
                         errors["collision_string"] = "iteration(s) where robots collided."
