@@ -75,7 +75,7 @@ class RobotariumABC(ABC):
             self.figure, self.axes = plt.subplots()
             self.axes.set_axis_off()
             for i in range(number_of_robots):
-                p = patches.RegularPolygon(self.poses[:2, i], 4, math.sqrt(2)*self.robot_radius, self.poses[2,i]+math.pi/4, facecolor='#FFD700', edgecolor = 'k')
+                p = patches.RegularPolygon((self.poses[:2, i]), 4, math.sqrt(2)*self.robot_radius, self.poses[2,i]+math.pi/4, facecolor='#FFD700', edgecolor = 'k')
 
                 rled = patches.Circle(self.poses[:2, i]+0.75*self.robot_radius*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i]))+0.04*np.array((-np.sin(self.poses[2, i]+math.pi/2), np.cos(self.poses[2, i]+math.pi/2)))),
                                        self.robot_radius/5, fill=False)
@@ -164,7 +164,6 @@ class RobotariumABC(ABC):
         p = self.poses
         b = self.boundaries
         N = self.number_of_robots
-
 
         for i in range(N):
             x = p[0,i]
