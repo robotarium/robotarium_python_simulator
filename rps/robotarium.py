@@ -75,6 +75,8 @@ class Robotarium(RobotariumABC):
             self._errors = self._validate()
             self._iterations += 1
 
+            # To be able to run experiments step by step:
+            # input("Press enter to continue")
 
             # Update dynamics of agents
             self.poses[0, :] = self.poses[0, :] + self.time_step*np.cos(self.poses[2,:])*self.velocities[0, :]
