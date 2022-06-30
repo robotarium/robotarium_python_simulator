@@ -41,7 +41,7 @@ class RobotariumABC(ABC):
 
         # Constants
         self.time_step = 0.033
-        self.robot_diameter = 0.11
+        self.robot_diameter = 0.095
         self.wheel_radius = 0.016
         self.base_length = 0.105
         self.max_linear_velocity = 0.2
@@ -51,7 +51,7 @@ class RobotariumABC(ABC):
         self.robot_radius = self.robot_diameter/2
 
         self.collision_offset = 0.0325 # 0.0525 for for simulation
-        self.collision_multiplier = 1.06
+        self.collision_diameter = 0.12
 
 
         self.velocities = np.zeros((2, number_of_robots))
@@ -70,6 +70,7 @@ class RobotariumABC(ABC):
         self.chassis_patches = []
         self.right_wheel_patches = []
         self.left_wheel_patches = []
+        self.base_patches = []
 
         if(self.show_figure):
             self.figure, self.axes = plt.subplots()
@@ -88,6 +89,8 @@ class RobotariumABC(ABC):
                 lw = patches.Circle(self.poses[:2, i]+self.robot_radius*np.array((np.cos(self.poses[2, i]-math.pi/2), np.sin(self.poses[2, i]-math.pi/2)))+\
                                                 0.04*np.array((-np.sin(self.poses[2, i]+math.pi/2))),\
                                                 0.02, facecolor='k')
+
+                base = patches.Circle(self.poses[:2, i], self.robot_radius/5, facecolor='r')
                 #lw = patches.RegularPolygon(self.poses[:2, i]+self.robot_radius*np.array((np.cos(self.poses[2, i]-math.pi/2), np.sin(self.poses[2, i]-math.pi/2)))+\
                 #                                0.035*np.array((-np.sin(self.poses[2, i]+math.pi/2), np.cos(self.poses[2, i]+math.pi/2))),\
                 #                                4, math.sqrt(2)*0.02, self.poses[2,i]+math.pi/4, facecolor='k')
@@ -97,12 +100,14 @@ class RobotariumABC(ABC):
                 self.right_led_patches.append(rled)
                 self.right_wheel_patches.append(rw)
                 self.left_wheel_patches.append(lw)
+                self.base_patches.append(base)
 
                 self.axes.add_patch(rw)
                 self.axes.add_patch(lw)
                 self.axes.add_patch(p)
                 self.axes.add_patch(lled)
                 self.axes.add_patch(rled)
+                self.axes.add_patch(base)
 
             # Draw arena
             self.boundary_patch = self.axes.add_patch(patches.Rectangle(self.boundaries[:2], self.boundaries[2], self.boundaries[3], fill=False))
@@ -180,7 +185,7 @@ class RobotariumABC(ABC):
             for k in range(j+1,N):
                 first_position = p[:2, j] + self.collision_offset*np.array([np.cos(p[2,j]), np.sin(p[2, j])])
                 second_position = p[:2, k] + self.collision_offset*np.array([np.cos(p[2,k]), np.sin(p[2, k])])
-                if(np.linalg.norm(first_position - second_position) <= (self.robot_diameter*self.collision_multiplier)):
+                if(np.linalg.norm(first_position - second_position) <= (self.collision_diameter)):
                 # if (np.linalg.norm(p[:2,j]-p[:2,k]) <= self.robot_diameter):
                     if "collision" in errors:
                         errors["collision"] += 1
