@@ -66,7 +66,9 @@ class Robotarium(RobotariumABC):
             """Increments the simulation by updating the dynamics.
             """
             assert(not self._called_step_already), "Make sure to call get_poses before calling step() again."
+            # To be able to run experiments step by step:
             # input(f"Iterations: {self._iterations}, Press Enter to continue...\n")
+            
             # Allow get_poses function to be called again.
             self._called_step_already = True
             self._checked_poses_already = False
@@ -75,8 +77,6 @@ class Robotarium(RobotariumABC):
             self._errors = self._validate()
             self._iterations += 1
 
-            # To be able to run experiments step by step:
-            input("Press enter to continue")
 
             # Update dynamics of agents
             self.poses[0, :] = self.poses[0, :] + self.time_step*np.cos(self.poses[2,:])*self.velocities[0, :]
@@ -94,8 +94,16 @@ class Robotarium(RobotariumABC):
                     self.previous_render_time = t
 
                 for i in range(self.number_of_robots):
-                    self.chassis_patches[i].xy = self.poses[:2, i] + self.robot_radius*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i])))
-                    self.chassis_patches[i].orientation = self.poses[2, i] + math.pi/4
+                    # self.chassis_patches[i].xy = self.poses[:2, i] + self.robot_radius*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i])))
+                    # if i == 0:
+                    #     print(self.poses[2, i] - math.pi/2)
+                    #     print('='*50)
+
+                    # self.chassis_patches[i].xy = self.poses[:2, i] + np.array(-self.robot_width/2 * np.sin(self.poses[2, i] + math.pi/2), self.robot_length/2 * np.cos(self.poses[2,i] + math.pi/2))
+                    self.chassis_patches[i].xy = self.poses[:2, i]+self.robot_radius*np.array((np.cos(self.poses[2, i]+math.pi/2), np.sin(self.poses[2, i]+math.pi/2)))+\
+                                            0.04*np.array((-np.sin(self.poses[2, i]+math.pi/2), np.cos(self.poses[2, i]+math.pi/2)))  + self.robot_radius*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i])))
+                    # self.chassis_patches[i].orientation = self.poses[2, i] + math.pi/4
+                    self.chassis_patches[i].angle = (self.poses[2, i] - math.pi/2) * 180/math.pi
 
                     self.right_wheel_patches[i].center = self.poses[:2, i]+self.robot_radius*np.array((np.cos(self.poses[2, i]+math.pi/2), np.sin(self.poses[2, i]+math.pi/2)))+\
                                             0.04*np.array((-np.sin(self.poses[2, i]+math.pi/2), np.cos(self.poses[2, i]+math.pi/2)))  + self.robot_radius*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i])))
@@ -109,7 +117,7 @@ class Robotarium(RobotariumABC):
                                     0.04*np.array((-np.sin(self.poses[2, i]), np.cos(self.poses[2, i]))) + self.robot_radius*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i])))
                     self.left_led_patches[i].center = self.poses[:2, i]+0.75*self.robot_radius*np.array((np.cos(self.poses[2,i]), np.sin(self.poses[2,i])))-\
                                     0.015*np.array((-np.sin(self.poses[2, i]), np.cos(self.poses[2, i]))) + self.robot_radius*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i])))
-                    self.base_patches[i].center = self.poses[:2, i]
+                    # self.base_patches[i].center = self.poses[:2, i]
                     
 
                 self.figure.canvas.draw_idle()
