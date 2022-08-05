@@ -194,7 +194,6 @@ class RobotariumABC(ABC):
                 # if (np.linalg.norm(p[:2,j]-p[:2,k]) <= self.robot_diameter):
                     if "collision" in errors:
                         errors["collision"] += 1
-                        # print("================Robots collided================")
                     else:
                         errors["collision"] = 1
                         errors["collision_string"] = "iteration(s) where robots collided."

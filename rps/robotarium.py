@@ -66,8 +66,6 @@ class Robotarium(RobotariumABC):
             """Increments the simulation by updating the dynamics.
             """
             assert(not self._called_step_already), "Make sure to call get_poses before calling step() again."
-            # TODO: To be able to run experiments step by step:
-            input(f"Iterations: {self._iterations}, Press Enter to continue...\n")
             
             # Allow get_poses function to be called again.
             self._called_step_already = True
