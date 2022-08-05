@@ -111,7 +111,7 @@ def create_robust_barriers(max_num_obstacles = 100, max_num_robots = 30, d = 5, 
 
         start = time.time()
         vnew = solver2.solve_qp(H, -np.squeeze(np.array(f)), A[0:count,0:2*num_robots].T, np.squeeze(np.array(b[0:count])))[0]
-        print("Time Taken by quadprog: {} s".format(time.time() - start))
+        #print("Time Taken by quadprog: {} s".format(time.time() - start))
         # Initial Guess for Solver at the Next Iteration
         # vnew = quadprog(H, double(f), -A(1:num_constraints,1:2*num_robots), -b(1:num_constraints), [], [], -wheel_vel_limit*ones(2*num_robots,1), wheel_vel_limit*ones(2*num_robots,1), [], opts);
         # Set robot velocities to new velocities

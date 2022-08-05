@@ -161,7 +161,7 @@ def create_clf_unicycle_pose_controller(approach_angle_gain=1, desired_angle_gai
 
     return pose_uni_clf_controller
 
-def create_hybrid_unicycle_pose_controller(linear_velocity_gain=1, angular_velocity_gain=2, velocity_magnitude_limit=0.15, angular_velocity_limit=np.pi, position_error=0.05, position_epsilon=0.02, rotation_error=0.05):
+def create_hybrid_unicycle_pose_controller(linear_velocity_gain=1, angular_velocity_gain=2, velocity_magnitude_limit=0.15, angular_velocity_limit=np.pi, position_error=0.05, position_epsilon=0.03, rotation_error=0.05):
     '''Returns a controller ($u: \mathbf{R}^{3 \times N} \times \mathbf{R}^{3 \times N} \to \mathbf{R}^{2 \times N}$)
     that will drive a unicycle-modeled agent to a pose (i.e., position & orientation). This controller is
     based on a hybrid controller that will drive the robot in a straight line to the desired position then rotate
