@@ -50,10 +50,10 @@ class RobotariumABC(ABC):
 
         self.robot_radius = self.robot_diameter/2
         self.robot_length = 0.095
-        self.robot_width = 0.085
+        self.robot_width = 0.09
 
         self.collision_offset = 0.0325 # May want to increase this
-        self.collision_diameter = 0.13
+        self.collision_diameter = 0.14
 
 
         self.velocities = np.zeros((2, number_of_robots))
