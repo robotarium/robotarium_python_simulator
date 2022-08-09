@@ -193,9 +193,20 @@ class RobotariumABC(ABC):
                 if(np.linalg.norm(first_position - second_position) <= (self.collision_diameter)):
                 # if (np.linalg.norm(p[:2,j]-p[:2,k]) <= self.robot_diameter):
                     if "collision" in errors:
-                        errors["collision"] += 1
+                        if j in errors["collision"]:
+                            errors["collision"][j] += 1
+                        else:
+                            errors["collision"][j] = 1
+                        # if k == N:
+                        if k in errors["collision"]:
+                            errors["collision"][k] += 1
+                        else:
+                            errors["collision"][k] = 1
                     else:
-                        errors["collision"] = 1
+                        errors["collision"]= {j: 1}
+                        errors["collision"][k] = 1
+                        # if k == N:
+
                         errors["collision_string"] = "iteration(s) where robots collided."
 
         dxdd = self._uni_to_diff(self.velocities)
