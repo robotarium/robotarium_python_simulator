@@ -181,9 +181,13 @@ class RobotariumABC(ABC):
 
             if(x < b[0] or x > (b[0] + b[2]) or y < b[1] or y > (b[1] + b[3])):
                     if "boundary" in errors:
-                        errors["boundary"] += 1
+                        if i in errors["boundary"]:
+                            errors["boundary"][i] += 1
+                        else:
+                            errors["boundary"][i] = 1
+                            
                     else:
-                        errors["boundary"] = 1
+                        errors["boundary"][i] = 1
                         errors["boundary_string"] = "iteration(s) robots were outside the boundaries."
 
         for j in range(N-1):
