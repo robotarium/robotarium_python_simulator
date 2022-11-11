@@ -52,9 +52,11 @@ class Robotarium(RobotariumABC):
             # TODO: check collision string and boundary string
             if bool(self._errors):
                 if "boundary" in self._errors:
-                    print('\t Simulation had {0} {1}\n'.format(self._errors["boundary"], self._errors["boundary_string"]))
+                    boundary_violations = max(self._errors["boundary"].values())
+                    print('\t Simulation had {0} {1}\n'.format(boundary_violations, self._errors["boundary_string"]))
                 if "collision" in self._errors:
-                    print('\t Simulation had {0} {1}\n'.format(self._errors["collision"], self._errors["collision_string"]))
+                    collision_violations = max(self._errors["collision"].values())
+                    print('\t Simulation had {0} {1}\n'.format(collision_violations, self._errors["collision_string"]))
                 if "actuator" in self._errors:
                     print('\t Simulation had {0} {1}'.format(self._errors["actuator"], self._errors["actuator_string"]))
             else:
