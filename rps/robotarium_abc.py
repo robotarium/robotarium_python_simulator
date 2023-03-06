@@ -187,7 +187,7 @@ class RobotariumABC(ABC):
                             errors["boundary"][i] = 1
                             
                     else:
-                        errors["boundary"][i] = 1
+                        errors["boundary"] = {i: 1}
                         errors["boundary_string"] = "iteration(s) robots were outside the boundaries."
 
         for j in range(N-1):
