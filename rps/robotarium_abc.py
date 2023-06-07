@@ -74,8 +74,8 @@ class RobotariumABC(ABC):
         self.left_wheel_patches = []
         self.base_patches = []
 
+        self.figure, self.axes = plt.subplots()
         if(self.show_figure):
-            self.figure, self.axes = plt.subplots()
             self.axes.set_axis_off()
             for i in range(number_of_robots):
                 # p = patches.RegularPolygon((self.poses[:2, i]), 4, math.sqrt(2)*self.robot_radius, self.poses[2,i]+math.pi/4, facecolor='#FFD700', edgecolor = 'k')
@@ -124,6 +124,9 @@ class RobotariumABC(ABC):
             plt.show()
 
             plt.subplots_adjust(left=-0.03, right=1.03, bottom=-0.03, top=1.03, wspace=0, hspace=0)
+        else:
+            self.figure.set_visible(False)
+            plt.draw()
 
     def set_velocities(self, ids, velocities):
 
