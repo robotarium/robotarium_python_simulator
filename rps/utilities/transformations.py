@@ -57,6 +57,7 @@ def create_si_to_uni_dynamics_with_backwards_motion(linear_velocity_gain=1, angu
         angular_velocity_limit: Limit for angular velocity (i.e., |w| < angular_velocity_limit)
 
     """
+    # TODO: Backwards motion is the same as without backwards motion.
 
     #Check user input types
     assert isinstance(linear_velocity_gain, (int, float)), "In the function create_si_to_uni_dynamics, the linear velocity gain (linear_velocity_gain) must be an integer or float. Recieved type %r." % type(linear_velocity_gain).__name__
