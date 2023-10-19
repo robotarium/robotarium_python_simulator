@@ -179,12 +179,12 @@ def create_hybrid_unicycle_pose_controller(linear_velocity_gain=1, angular_veloc
 
     si_to_uni_dyn = create_si_to_uni_dynamics(linear_velocity_gain=linear_velocity_gain, angular_velocity_limit=angular_velocity_limit)
 
-    def pose_uni_hybrid_controller(states, poses, input_approach_state = np.empty([0,0])):
+    def pose_uni_hybrid_controller(states, poses, approach_state = np.empty([0,0])):
         N=states.shape[1]
         dxu = np.zeros((2,N))
 
         #This is essentially a hack since default arguments are evaluated only once we will mutate it with each call
-        if input_approach_state.shape[1] != N: 
+        if approach_state.shape[1] != N: 
             approach_state = np.ones((1,N))[0]
 
         for i in range(N):
