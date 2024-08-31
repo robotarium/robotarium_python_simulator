@@ -105,18 +105,26 @@ class Robotarium(RobotariumABC):
                     # self.chassis_patches[i].orientation = self.poses[2, i] + math.pi/4
                     self.chassis_patches[i].angle = (self.poses[2, i] - math.pi/2) * 180/math.pi
 
+                    self.chassis_patches[i].zorder = 2
+
                     self.right_wheel_patches[i].center = self.poses[:2, i]+self.robot_length/2*np.array((np.cos(self.poses[2, i]+math.pi/2), np.sin(self.poses[2, i]+math.pi/2)))+\
                                             0.04*np.array((-np.sin(self.poses[2, i]+math.pi/2), np.cos(self.poses[2, i]+math.pi/2)))  + self.robot_length/2*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i])))
                     self.right_wheel_patches[i].orientation = self.poses[2, i] + math.pi/4
 
+                    self.right_wheel_patches[i].zorder = 2
+
                     self.left_wheel_patches[i].center = self.poses[:2, i]+self.robot_length/2*np.array((np.cos(self.poses[2, i]-math.pi/2), np.sin(self.poses[2, i]-math.pi/2)))+\
                                             0.04*np.array((-np.sin(self.poses[2, i]+math.pi/2), np.cos(self.poses[2, i]+math.pi/2))) + self.robot_length/2*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i])))
                     self.left_wheel_patches[i].orientation = self.poses[2,i] + math.pi/4
+
+                    self.left_wheel_patches[i].zorder = 2
                     
                     self.right_led_patches[i].center = self.poses[:2, i]+0.75*self.robot_length/2*np.array((np.cos(self.poses[2,i]), np.sin(self.poses[2,i])))-\
                                     0.04*np.array((-np.sin(self.poses[2, i]), np.cos(self.poses[2, i]))) + self.robot_length/2*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i])))
                     self.left_led_patches[i].center = self.poses[:2, i]+0.75*self.robot_length/2*np.array((np.cos(self.poses[2,i]), np.sin(self.poses[2,i])))-\
                                     0.015*np.array((-np.sin(self.poses[2, i]), np.cos(self.poses[2, i]))) + self.robot_length/2*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i])))
+                    self.left_led_patches[i].zorder = 2
+                    self.right_led_patches[i].zorder = 2
                     # self.base_patches[i].center = self.poses[:2, i]
                     
 
