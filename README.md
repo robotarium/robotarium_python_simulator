@@ -17,7 +17,7 @@ The following dependencies are required for utilization of the simulator:
 - [matplotlib] (http://matplotlib.org/index.html)
 - [CVXOPT] (http://cvxopt.org/index.html)
 
-NOTE: The SciPy stack and matplotlib can be difficult to install on Windows. However, [this] (http://www.lfd.uci.edu/~gohlke/pythonlibs/) link provides .whl files necessary for installation. Make sure to install all the dependencies for each version part of the SciPy and matplotlib stack!
+NOTE: The SciPy stack and matplotlib can be difficult to install on Windows. Make sure to install all the dependencies for each version part of the SciPy and matplotlib stack!
 
 ## Dependency Installation
 
