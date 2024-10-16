@@ -150,10 +150,6 @@ def create_clf_unicycle_pose_controller(approach_angle_gain=1, desired_angle_gai
             ca = np.cos(alpha)
             sa = np.sin(alpha)
 
-            print(gamma)
-            print(e)
-            print(ca)
-
             dxu[0,i] = gamma* e* ca
             dxu[1,i] = k*alpha + gamma*((ca*sa)/alpha)*(alpha + h*theta)
 
