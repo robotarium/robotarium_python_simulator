@@ -128,14 +128,6 @@ class RobotariumABC(ABC):
             plt.draw()
 
     def set_velocities(self, ids, velocities):
-
-        # Threshold linear velocities
-        idxs = np.where(np.abs(velocities[0, :]) > self.max_linear_velocity)
-        velocities[0, idxs] = self.max_linear_velocity*np.sign(velocities[0, idxs])
-
-        # Threshold angular velocities
-        idxs = np.where(np.abs(velocities[1, :]) > self.max_angular_velocity)
-        velocities[1, idxs] = self.max_angular_velocity*np.sign(velocities[1, idxs])
         self.velocities = velocities
 
     @abstractmethod
@@ -154,6 +146,7 @@ class RobotariumABC(ABC):
         dxdd[to_thresh] = self.max_wheel_velocity*np.sign(dxdd[to_thresh])
 
         dxu = self._diff_to_uni(dxdd)
+        return dxu
 
     def _uni_to_diff(self, dxu):
         r = self.wheel_radius
@@ -222,7 +215,7 @@ class RobotariumABC(ABC):
                 errors["actuator"] += 1
             else:
                 errors["actuator"] = 1
-                errors["actuator_string"] = "iteration(s) where the actuator limits were exceeded."
+                errors["actuator_string"] = "iteration(s) where the actuator limits of at least one robot were exceeded and thresholded to their maximum rotational velocity."
 
         return errors
 

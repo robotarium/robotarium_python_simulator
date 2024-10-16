@@ -48,7 +48,7 @@ class Robotarium(RobotariumABC):
             end of your script will enable execution on the Robotarium testbed.
             """
             print('##### DEBUG OUTPUT #####')
-            print('Your simulation will take approximately {0} real seconds when deployed on the Robotarium. \n'.format(math.ceil(self._iterations*0.033)))
+            print('Your simulation will take approximately {0} real seconds when deployed on the Robotarium. \n'.format(math.ceil(self._iterations*self.time_step)))
             # TODO: check collision string and boundary string
             if bool(self._errors):
                 if "boundary" in self._errors:
@@ -77,6 +77,8 @@ class Robotarium(RobotariumABC):
             self._errors = self._validate()
             self._iterations += 1
 
+            #Perform Thresholding of Motors
+            self.velocities = self._threshold(self.velocities)
 
             # Update dynamics of agents
             self.poses[0, :] = self.poses[0, :] + self.time_step*np.cos(self.poses[2,:])*self.velocities[0, :]
@@ -94,15 +96,9 @@ class Robotarium(RobotariumABC):
                     self.previous_render_time = t
 
                 for i in range(self.number_of_robots):
-                    # self.chassis_patches[i].xy = self.poses[:2, i] + self.robot_radius*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i])))
-                    # if i == 0:
-                    #     print(self.poses[2, i] - math.pi/2)
-                    #     print('='*50)
-
-                    # self.chassis_patches[i].xy = self.poses[:2, i] + np.array(-self.robot_width/2 * np.sin(self.poses[2, i] + math.pi/2), self.robot_length/2 * np.cos(self.poses[2,i] + math.pi/2))
                     self.chassis_patches[i].xy = self.poses[:2, i]+self.robot_length/2*np.array((np.cos(self.poses[2, i]+math.pi/2), np.sin(self.poses[2, i]+math.pi/2)))+\
                                             0.04*np.array((-np.sin(self.poses[2, i]+math.pi/2), np.cos(self.poses[2, i]+math.pi/2)))  + self.robot_length/2*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i])))
-                    # self.chassis_patches[i].orientation = self.poses[2, i] + math.pi/4
+                    
                     self.chassis_patches[i].angle = (self.poses[2, i] - math.pi/2) * 180/math.pi
 
                     self.chassis_patches[i].zorder = 2
@@ -124,9 +120,7 @@ class Robotarium(RobotariumABC):
                     self.left_led_patches[i].center = self.poses[:2, i]+0.75*self.robot_length/2*np.array((np.cos(self.poses[2,i]), np.sin(self.poses[2,i])))-\
                                     0.015*np.array((-np.sin(self.poses[2, i]), np.cos(self.poses[2, i]))) + self.robot_length/2*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i])))
                     self.left_led_patches[i].zorder = 2
-                    self.right_led_patches[i].zorder = 2
-                    # self.base_patches[i].center = self.poses[:2, i]
-                    
+                    self.right_led_patches[i].zorder = 2 
 
                 self.figure.canvas.draw_idle()
                 self.figure.canvas.flush_events()
