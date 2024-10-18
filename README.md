@@ -1,7 +1,7 @@
 Introduction
 ============
 
-This is a Python simulator for Robotarium! The Robotarium is a project at Georgia Institute of Technology allowing public, remote access to a state-of-the-art multi-robot testbed.
+This is a Python simulator for Robotarium! [The Robotarium](https://www.robotarium.gatech.edu/) is a project at Georgia Institute of Technology allowing public, remote access to a state-of-the-art multi-robot testbed.
 
 This is an open-source, re-implementation of the [MATLAB simulator]  (https://github.com/robotarium/robotarium-matlab-simulator) in Python.
 
