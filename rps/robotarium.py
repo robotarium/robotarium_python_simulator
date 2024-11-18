@@ -89,12 +89,6 @@ class Robotarium(RobotariumABC):
 
             # Update graphics
             if(self.show_figure):
-                if(self.sim_in_real_time):
-                    t = time.time()
-                    while(t - self.previous_render_time < self.time_step):
-                        t=time.time()
-                    self.previous_render_time = t
-
                 for i in range(self.number_of_robots):
                     self.chassis_patches[i].xy = self.poses[:2, i]+self.robot_length/2*np.array((np.cos(self.poses[2, i]+math.pi/2), np.sin(self.poses[2, i]+math.pi/2)))+\
                                             0.04*np.array((-np.sin(self.poses[2, i]+math.pi/2), np.cos(self.poses[2, i]+math.pi/2)))  + self.robot_length/2*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i])))
@@ -124,4 +118,10 @@ class Robotarium(RobotariumABC):
 
                 self.figure.canvas.draw_idle()
                 self.figure.canvas.flush_events()
+
+            if(self.sim_in_real_time):
+                t = time.time()
+                while(t - self.previous_render_time < self.time_step):
+                    t=time.time()
+                self.previous_render_time = t
 
