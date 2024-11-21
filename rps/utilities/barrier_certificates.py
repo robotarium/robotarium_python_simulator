@@ -55,6 +55,12 @@ def create_single_integrator_barrier_certificate(barrier_gain=100, safety_radius
         
         # Initialize some variables for computational savings
         N = dxi.shape[1]
+        
+        #If only one robot, no need for barriers.
+        if(N < 2)
+           return dxi 
+        end
+
         num_constraints = int(comb(N, 2))
         A = np.zeros((num_constraints, 2*N))
         b = np.zeros(num_constraints)
