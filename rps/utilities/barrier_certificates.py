@@ -57,9 +57,8 @@ def create_single_integrator_barrier_certificate(barrier_gain=100, safety_radius
         N = dxi.shape[1]
         
         #If only one robot, no need for barriers.
-        if(N < 2)
-           return dxi 
-        end
+        if(N < 2):
+           return dxi
 
         num_constraints = int(comb(N, 2))
         A = np.zeros((num_constraints, 2*N))
@@ -508,10 +507,10 @@ def create_unicycle_differential_drive_barrier_certificate(max_num_obstacle_poin
 
         # Alternative Solver
         #start = time.time()
-        #vnew2 = solvers.qp(matrix(H), matrix(f), -matrix(A[0:count,0:2*num_robots]), -matrix( b[0:count]))['x'] # , A, b) Omit last 2 arguments since our QP has no equality constraints
+        vnew = qp(matrix(H), matrix(f), -matrix(A[0:count,0:2*num_robots]), -matrix( b[0:count]))['x'] # , A, b) Omit last 2 arguments since our QP has no equality constraints
         #print("Time Taken by cvxOpt: {} s".format(time.time() - start))
 
-        vnew = solver2.solve_qp(H, -np.squeeze(np.array(f)), A[0:count,0:2*num_robots].T, np.squeeze(np.array(b[0:count])))[0]
+        # vnew = solver2.solve_qp(H, -np.squeeze(np.array(f)), A[0:count,0:2*num_robots].T, np.squeeze(np.array(b[0:count])))[0]
         # Initial Guess for Solver at the Next Iteration
         # vnew = quadprog(H, double(f), -A(1:num_constraints,1:2*num_robots), -b(1:num_constraints), [], [], -wheel_vel_limit*ones(2*num_robots,1), wheel_vel_limit*ones(2*num_robots,1), [], opts);
         # Set robot velocities to new velocities
