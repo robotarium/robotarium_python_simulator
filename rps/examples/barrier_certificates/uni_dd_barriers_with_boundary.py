@@ -15,7 +15,7 @@ r = robotarium.Robotarium(number_of_robots=N, show_figure=True, sim_in_real_time
 iterations = 3000
 
 # Define goal points outside of the arena
-goal_points = np.array(np.mat('5 5 5 5 5; 5 5 5 5 5; 0 0 0 0 0'))
+goal_points = np.array(np.asmatrix('5 5 5 5 5; 5 5 5 5 5; 0 0 0 0 0'))
 
 # Create unicycle position controller
 unicycle_position_controller = create_clf_unicycle_position_controller()
