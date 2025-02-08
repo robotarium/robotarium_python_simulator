@@ -103,5 +103,4 @@ class Robotarium(RobotariumABC):
 
         # update poses
         poses = jnp.vstack((x, y, theta))
-        print(poses.shape)
         return poses

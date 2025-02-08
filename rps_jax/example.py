@@ -26,15 +26,19 @@ class WrappedRobotarium(object):
         new_poses = jax.vmap(self.env.batch_step, in_axes=(0, 0))(poses, actions)
         return new_poses, new_poses
 
-
-
-
 def main():
     env = Robotarium(number_of_robots=1)
-    wrapped_env = WrappedRobotarium(env, 10)
-    initial_poses = jnp.zeros((10, 3, 1))
-    final_poses, batch = jax.lax.scan(wrapped_env.batched_step, initial_poses, None, 400)
-    
+    num_envs = 1
+    wrapped_env = WrappedRobotarium(env, num_envs)
+    initial_poses = jnp.zeros((num_envs, 3, 1))
+    final_poses, batch = jax.lax.scan(wrapped_env.batched_step, initial_poses, None, 1_000_000)
+    return batch
+
+if __name__ == "__main__":
+    run = jax.jit(main)
+    batch = jax.block_until_ready(run())
+    print(batch.shape)
+
     # Select one environment to plot
     env_index = 0
 
@@ -51,6 +55,3 @@ def main():
     plt.legend()
     plt.grid(True)
     plt.show()
-
-if __name__ == "__main__":
-    main()
