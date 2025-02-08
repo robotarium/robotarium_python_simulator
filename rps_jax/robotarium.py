@@ -43,6 +43,15 @@ class Robotarium(RobotariumABC):
 
         return self.poses
     
+    def set_poses(self, poses):
+        """
+        Set the poses of the agents.
+
+        Args:
+            poses (jnp.ndarray): 3xN array of robot poses
+        """
+        self.poses = poses
+    
     def step(self):
         """Increment the simulation one step forward."""
         assert(self._called_step_already), "Must call get_poses() before calling step()."
@@ -68,3 +77,31 @@ class Robotarium(RobotariumABC):
 
         # update poses
         self.poses = jnp.vstack((x, y, theta))
+    
+    def batch_step(self, poses, velocities):
+        """Increment the simulation one step forward."""
+        # assert(self._called_step_already), "Must call get_poses() before calling step()."
+
+        # # allow get_poses to be called again
+        # self._called_step_already = True
+        # self._checked_poses_already = False
+
+        # # validate before thresholding velocities
+        # self._errors = self._validate()
+        # self._iterations += 1
+
+        # perform thresholding of motors
+        velocities = self._threshold(velocities)
+
+        # x, y, theta
+        x = poses[0, :] + self.time_step * jnp.cos(poses[2, :]) * velocities[0, :]
+        y = poses[1, :] + self.time_step * jnp.sin(poses[2, :]) * velocities[0, :]
+        theta = poses[2, :] + self.time_step * velocities[1, :]
+
+        # ensure angles are wrapped
+        theta = jnp.arctan2(jnp.sin(theta), jnp.cos(theta))
+
+        # update poses
+        poses = jnp.vstack((x, y, theta))
+        print(poses.shape)
+        return poses
