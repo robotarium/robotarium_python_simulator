@@ -4,6 +4,7 @@ import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from jax import jit, vmap, lax
+from functools import partial
 
 
 class WrappedRobotarium(object):
@@ -22,22 +23,22 @@ class WrappedRobotarium(object):
 
     def batched_step(self, poses, unused):
         actions = vmap(self.move_circle, in_axes=(0, None))(poses, 1.0)
-        print(actions.shape)
+        # print(actions.shape)
         new_poses = jax.vmap(self.env.batch_step, in_axes=(0, 0))(poses, actions)
         return new_poses, new_poses
 
-def main():
+@partial(jax.jit, static_argnames=('num_envs', 'num_t'))
+def drive_in_circle_jax(num_envs, num_t):
     env = Robotarium(number_of_robots=1)
-    num_envs = 1
-    timesteps = 1_000_000
     wrapped_env = WrappedRobotarium(env, num_envs)
     initial_poses = jnp.zeros((num_envs, 3, 1))
-    final_poses, batch = jax.lax.scan(wrapped_env.batched_step, initial_poses, None, timesteps)
+    final_poses, batch = jax.lax.scan(wrapped_env.batched_step, initial_poses, None, num_t)
     return batch
 
 if __name__ == "__main__":
-    run = jax.jit(main)
-    batch = jax.block_until_ready(run())
+    num_envs = 10
+    num_t = 1_000_000
+    batch = jax.block_until_ready(drive_in_circle_jax(num_envs, num_t))
     print(batch.shape)
 
     # Select one environment to plot

@@ -29,7 +29,7 @@ def drive_in_circle(num_env, num_t):
             r.get_poses()
             # poses.vstack((poses, r.get_poses()))
 
-# Example usage
-num_env = 1
-num_t = 1_000_000
-drive_in_circle(num_env, num_t)
+# # Example usage
+# num_env = 1
+# num_t = 1_000_000
+# drive_in_circle(num_env, num_t)
