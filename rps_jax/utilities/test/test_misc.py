@@ -1,11 +1,10 @@
 import unittest
 import jax
 import jax.numpy as jnp
-from jax import jit, vmap
 from rps_jax.utilities.misc import generate_initial_conditions, at_pose, at_position
 
 
-class TestMiscFunctions(unittest.TestCase):
+class TestMisc(unittest.TestCase):
     """unit tests for misc.py"""
 
     def test_generate_initial_conditions(self):
