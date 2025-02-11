@@ -54,7 +54,7 @@ class Robotarium(RobotariumABC):
     
     def step(self):
         """Increment the simulation one step forward."""
-        assert(self._called_step_already), "Must call get_poses() before calling step()."
+        assert(self._checked_poses_already), "Must call get_poses() before calling step()."
 
         # allow get_poses to be called again
         self._called_step_already = True
