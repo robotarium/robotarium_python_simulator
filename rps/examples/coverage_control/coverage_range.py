@@ -29,7 +29,7 @@ si_to_uni_dyn, uni_to_si_states = create_si_to_uni_mapping()
 
 # Workspace bounds and grid resolution
 x_min, x_max = -1.5, 1.5
-y_min, y_max = -1, 1
+y_min, y_max = -1.0, 1.0
 res = 0.05
 
 # Generate grid points for workspace discretization
@@ -38,13 +38,13 @@ grid_points = np.vstack([X.ravel(), Y.ravel()])  # Shape: (2, M)
 
 # Robot parameters (heterogeneous sensing ranges and velocities)
 R_sr = np.array([1.0, 1.0, 0.5, 1.0, 1.0])  # Sensing ranges for each robot (normalized)
-Vr = np.array([1.0, 1.0, 1.0, 1.0, 1.0])  # Velocity limits for each robot (m/s)
+Vr = np.array([1.0] * N)  # Velocity limits for each robot (m/s)
 
 # Density function φ(q), assumed constant (uniform distribution)
-phi_q = np.ones(grid_points.shape[1])
+phi_q = np.random.uniform(0.5, 1.5, grid_points.shape[1])
 
 
-# Weight function definition
+# Weight function definition based on distance and sensing range
 def weight_function(distance_squared, R):
     distance = np.sqrt(distance_squared)
     return np.maximum(1 - (distance / R), 0)
@@ -57,7 +57,7 @@ k_gain = 1
 cost_list = []  # Stores cost history
 prev_cost = None  # Cost from previous iteration
 
-# Main simulation loop
+# Main simulation loop with debugging and fixes
 for k in range(iterations):
     # Get current robot poses and convert to single-integrator states (positions only)
     x = r.get_poses()
@@ -83,7 +83,6 @@ for k in range(iterations):
 
     for i in range(N):
         mask_i = (robot_assignments == i) & within_range[i]
-
         if np.any(mask_i):  # If any grid points are assigned to this robot
             distances_squared_i = D_squared[i][mask_i]
             weights_i = weight_function(distances_squared_i, R_sr[i])
@@ -120,9 +119,11 @@ for k in range(iterations):
 
         print(f"Iteration {k}: Cost={range_limited_cost:.6f}, Centroids={c_v}, Weights={w_v}")
 
-        smoothed_cost = np.mean(cost_list[-10:]) if len(cost_list) > 10 else range_limited_cost
+        smoothed_cost = (
+            np.mean(cost_list[-10:]) if len(cost_list) > 10 else range_limited_cost
+        )
 
-        if prev_cost is not None:
+        if k > 10 and prev_cost is not None:
             relative_change = abs(smoothed_cost - prev_cost) / max(prev_cost, 1e-10)
 
             if relative_change < 1e-3:  # Convergence condition based on relative change in cost
@@ -135,9 +136,8 @@ for k in range(iterations):
         print(f"Simulation terminated early at iteration {k} due to: {e}")
         break
 
-# Save cost data to CSV file for analysis
+# Save cost data for analysis
 df_costs = pd.DataFrame(cost_list)
-df_costs.to_csv('range_only_coverage_cost.csv', index=False)
+df_costs.to_csv('range_only_coverage_debugged.csv', index=False)
 
-# Call at end of script to print debug information and ensure proper execution on Robotarium server
 r.call_at_scripts_end()
