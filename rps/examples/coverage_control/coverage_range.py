@@ -1,6 +1,5 @@
 import rps.robotarium as robotarium
 from rps.utilities.transformations import create_si_to_uni_mapping
-from rps.utilities.barrier_certificates import create_single_integrator_barrier_certificate_with_boundary
 import numpy as np
 import pandas as pd
 
@@ -14,7 +13,7 @@ initial_conditions = np.array([
     [0.0, 0.0, 0.0, 0.0, 0.0]  # orientations for 5 robots
 ])
 
-# Create the Robotarium object using the initial conditions
+# Create Robotarium object
 r = robotarium.Robotarium(
     number_of_robots=N,
     show_figure=True,
@@ -24,7 +23,8 @@ r = robotarium.Robotarium(
 
 # Simulation parameters
 iterations = 1000
-si_barrier_cert = create_single_integrator_barrier_certificate_with_boundary()
+
+# Disable collision avoidance (as per experiment settings)
 si_to_uni_dyn, uni_to_si_states = create_si_to_uni_mapping()
 
 # Workspace bounds and grid resolution
@@ -37,16 +37,25 @@ X, Y = np.meshgrid(np.arange(x_min, x_max, res), np.arange(y_min, y_max, res))
 grid_points = np.vstack([X.ravel(), Y.ravel()])  # Shape: (2, M)
 
 # Robot parameters (heterogeneous sensing ranges and velocities)
-R_sr = np.array([1,1,0.5,1,1])  # Sensing ranges for each robot
-Vr = np.array([1,1,1,1,1])  # Velocity limits for each robot
+R_sr = np.array([1.0, 1.0, 0.5, 1.0, 1.0])  # Sensing ranges for each robot (normalized)
+Vr = np.array([1.0, 1.0, 1.0, 1.0, 1.0])  # Velocity limits for each robot (m/s)
 
-# Control gain
+# Density function φ(q), assumed constant (uniform distribution)
+phi_q = np.ones(grid_points.shape[1])
+
+
+# Weight function definition
+def weight_function(distance_squared, R):
+    distance = np.sqrt(distance_squared)
+    return np.maximum(1 - (distance / R), 0)
+
+
+# Control gain (k=1 as per Baseline)
 k_gain = 1
 
 # Variables to store results and track convergence
 cost_list = []  # Stores cost history
 prev_cost = None  # Cost from previous iteration
-convergence_iter = None  # Iteration when convergence is declared
 
 # Main simulation loop
 for k in range(iterations):
@@ -56,103 +65,79 @@ for k in range(iterations):
 
     # Compute distances from all grid points to all robots (vectorized)
     diff = grid_points[:, None] - x_si[:, :, None]  # Shape: (2, N, M)
-    D = np.linalg.norm(diff, axis=0)  # Shape: (N, M)
+    D_squared = np.sum(diff ** 2, axis=0)  # Squared distances (N x M)
 
     # Determine grid cells within sensing range of each robot
-    within_range = D <= R_sr[:, None]
-
-    # Identify valid grid cells (covered by at least one robot)
-    valid_mask = np.any(within_range, axis=0)  # Shape: (M,)
+    within_range = D_squared <= R_sr[:, None] ** 2
 
     # Mask out-of-range distances as infinity for assignment purposes
-    D_masked = np.where(within_range, D, np.inf)
+    D_masked = np.where(within_range, D_squared, np.inf)
 
     # Assign each grid point to the closest robot within its sensing range
     robot_assignments = np.argmin(D_masked, axis=0)  # Robot responsible for each cell (M,)
 
-    # Compute range-limited cost
+    # Compute range-limited cost and centroids of Voronoi regions
     range_limited_cost = 0
+    c_v = np.zeros((N, 2))  # Centroid vector for each robot
+    w_v = np.zeros(N)  # Weight vector for each robot
 
     for i in range(N):
-        # Mask for grid points assigned to robot i
-        mask_i = (robot_assignments == i)
+        mask_i = (robot_assignments == i) & within_range[i]
 
-        # Covered cost (first term)
-        if np.any(mask_i):
-            distances_squared = np.sum((grid_points[:, mask_i] - x_si[:, i:i + 1]) ** 2, axis=0)
-            covered_cost = np.sum(distances_squared * res ** 2)  # Multiply by grid resolution squared
-        else:
-            covered_cost = 0
+        if np.any(mask_i):  # If any grid points are assigned to this robot
+            distances_squared_i = D_squared[i][mask_i]
+            weights_i = weight_function(distances_squared_i, R_sr[i])
 
-        # Uncovered cost (second term)
-        uncovered_mask = ~valid_mask
-        if np.any(uncovered_mask):
-            uncovered_cost = R_sr[i] ** 2 * np.sum(uncovered_mask * res ** 2)
-        else:
-            uncovered_cost = 0
+            # Compute covered region cost (integral over Voronoi ∩ B(p_i,R))
+            covered_cost = np.sum(phi_q[mask_i] * weights_i * distances_squared_i * res ** 2)
+            range_limited_cost += covered_cost
 
-        # Add to total cost
-        range_limited_cost += covered_cost + uncovered_cost
+            # Compute centroid of the range-limited Voronoi region
+            c_v[i] += np.sum(grid_points[:, mask_i] * phi_q[mask_i] * weights_i[None], axis=1)
+            w_v[i] += np.sum(phi_q[mask_i] * weights_i)
 
-    # Append cost to history for debugging or analysis
+        if w_v[i] > 0:
+            c_v[i] /= w_v[i]
+
     cost_list.append(range_limited_cost)
 
-    # Compute centroids of range-limited Voronoi regions for each robot
-    c_v = np.zeros((N, 2))  # Accumulator for grid cell coordinates (x,y)
-    w_v = np.zeros(N)  # Weight of grid cells assigned to each robot
-
-    for i in range(N):
-        mask_i = (robot_assignments == i) & valid_mask  # Grid cells assigned to robot i and covered
-        if np.sum(mask_i) > 0:
-            c_v[i] += np.sum(grid_points[:, mask_i], axis=1)
-            w_v[i] += np.sum(mask_i)
-
-    # Initialize single-integrator control inputs based on centroids
+    # Compute control inputs (velocities) based on centroids
     si_velocities = np.zeros((2, N))
 
     for i in range(N):
         if w_v[i] > 0:
-            centroid = c_v[i] / w_v[i]
-            si_velocities[:, i] = k_gain * (centroid - x_si[:, i])
+            centroid = c_v[i]
+            velocity = k_gain * (centroid - x_si[:, i])
 
-    # Enforce collision and boundary safety constraints using barrier certificates
-    si_velocities = si_barrier_cert(si_velocities, x_si)
+            # Scale velocity based on max speed of the robot
+            si_velocities[:, i] = velocity / max(np.linalg.norm(velocity), Vr[i])
 
-    # Scale velocities by maximum speed limits of each robot
-    for i in range(N):
-        norm_v = np.linalg.norm(si_velocities[:, i])
-        if norm_v > Vr[i]:
-            si_velocities[:, i] *= Vr[i] / norm_v
-
-    # Convert single-integrator velocities to unicycle dynamics and set velocities
-    dxu = si_to_uni_dyn(si_velocities, x)
+    dxu = si_to_uni_dyn(si_velocities, x)  # Transform SI to unicycle dynamics
 
     try:
-        r.set_velocities(np.arange(N), dxu)
-        r.step()  # Iterate the simulation
+        r.set_velocities(np.arange(N), dxu)  # Set velocities of agents
+        r.step()  # Step simulation forward
 
-        # Debugging information
         print(f"Iteration {k}: Cost={range_limited_cost:.6f}, Centroids={c_v}, Weights={w_v}")
 
-        # Check convergence based on relative change in cost function value
+        smoothed_cost = np.mean(cost_list[-10:]) if len(cost_list) > 10 else range_limited_cost
+
         if prev_cost is not None:
-            relative_change = abs(range_limited_cost - prev_cost) / (prev_cost)
-            if relative_change < 1e-3:  # Relaxed threshold for convergence
+            relative_change = abs(smoothed_cost - prev_cost) / max(prev_cost, 1e-10)
+
+            if relative_change < 1e-3:  # Convergence condition based on relative change in cost
                 print(f"Converged at iteration {k} with relative change {relative_change:.6f}")
-                convergence_iter = k
                 break
 
-        prev_cost = range_limited_cost
+        prev_cost = smoothed_cost
 
     except Exception as e:
         print(f"Simulation terminated early at iteration {k} due to: {e}")
         break
 
-# Save results to CSV file after simulation ends
-df_results = pd.DataFrame({
-    'Iteration': np.arange(len(cost_list)),
-    'Range_Limited_Cost': cost_list,
-})
-df_results.to_csv('range_only_coverage_results.csv', index=False)
+# Save cost data to CSV file for analysis
+df_costs = pd.DataFrame(cost_list)
+df_costs.to_csv('range_only_coverage_cost.csv', index=False)
 
-r.call_at_scripts_end()  # Properly close the Robotarium instance
+# Call at end of script to print debug information and ensure proper execution on Robotarium server
+r.call_at_scripts_end()
