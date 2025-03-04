@@ -6,138 +6,165 @@ import pandas as pd
 # Number of robots
 N = 5
 
-# Define initial conditions: row 1 for x, row 2 for y, row 3 for orientation
+# Define initial conditions
 initial_conditions = np.array([
-    [1.25, 1.0, 1.0, -1.0, 0.1],  # x positions for 5 robots
-    [0.25, 0.5, -0.5, -0.75, 0.2],  # y positions for 5 robots
-    [0.0, 0.0, 0.0, 0.0, 0.0]  # orientations for 5 robots
+    [1.25, 1.0, 1.0, -1.0, 0.1],  # x positions
+    [0.25, 0.5, -0.5, -0.75, 0.2],  # y positions
+    [0.0, 0.0, 0.0, 0.0, 0.0]  # orientations
 ])
 
 # Create Robotarium object
 r = robotarium.Robotarium(
     number_of_robots=N,
     show_figure=True,
-    sim_in_real_time=True,
+    sim_in_real_time=False,
     initial_conditions=initial_conditions
 )
 
 # Simulation parameters
 iterations = 1000
+MIN_ITERATIONS = 1000  # Minimum iterations before convergence check
+CONVERGENCE_THRESHOLD = 1e-3  # Looser convergence threshold
 
-# Disable collision avoidance (as per experiment settings)
+# Dynamics mapping
 si_to_uni_dyn, uni_to_si_states = create_si_to_uni_mapping()
 
-# Workspace bounds and grid resolution
+# Workspace parameters
 x_min, x_max = -1.5, 1.5
 y_min, y_max = -1.0, 1.0
 res = 0.05
 
-# Generate grid points for workspace discretization
+# Generate grid points
 X, Y = np.meshgrid(np.arange(x_min, x_max, res), np.arange(y_min, y_max, res))
-grid_points = np.vstack([X.ravel(), Y.ravel()])  # Shape: (2, M)
+grid_points = np.vstack([X.ravel(), Y.ravel()])  # (2, M)
 
-# Robot parameters (heterogeneous sensing ranges and velocities)
-R_sr = np.array([1.0, 1.0, 0.5, 1.0, 1.0])  # Sensing ranges for each robot (normalized)
-Vr = np.array([1.0] * N)  # Velocity limits for each robot (m/s)
+# Robot parameters (heterogeneous)
+R_sr = np.array([1.0, 1.0, 0.5, 1.0, 1.0])  # Sensing ranges
+Vr = np.array([1.0, 1.0, 1.0, 1.0, 1.0])  # Max velocities
 
-# Density function φ(q), assumed constant (uniform distribution)
-phi_q = np.random.uniform(0.5, 1.5, grid_points.shape[1])
+# Density function (constant for this example)
+phi_q = np.ones(grid_points.shape[1])  # Uniform density
 
 
-# Weight function definition based on distance and sensing range
+# Weight function with linear decay
 def weight_function(distance_squared, R):
     distance = np.sqrt(distance_squared)
-    return np.maximum(1 - (distance / R), 0)
+    return np.clip(1 - (distance / R), 0, 1)
 
 
-# Control gain (k=1 as per Baseline)
-k_gain = 1
+# Control gain
+k_gain = 1.0
 
-# Variables to store results and track convergence
-cost_list = []  # Stores cost history
-prev_cost = None  # Cost from previous iteration
+# Cost history and convergence tracking
+cost_history = []
+prev_smoothed_cost = None
 
-# Main simulation loop with debugging and fixes
+# Main simulation loop
 for k in range(iterations):
-    # Get current robot poses and convert to single-integrator states (positions only)
     x = r.get_poses()
-    x_si = uni_to_si_states(x)[:2, :]  # Shape: (2, N)
+    x_si = uni_to_si_states(x)[:2, :]  # (2, N)
 
-    # Compute distances from all grid points to all robots (vectorized)
-    diff = grid_points[:, None] - x_si[:, :, None]  # Shape: (2, N, M)
-    D_squared = np.sum(diff ** 2, axis=0)  # Squared distances (N x M)
+    # Compute distances between all robots and grid points
+    diff = grid_points[:, :, None] - x_si[:, None, :]  # (2, M, N)
+    D_squared = np.sum(diff ** 2, axis=0)  # (M, N)
 
-    # Determine grid cells within sensing range of each robot
-    within_range = D_squared <= R_sr[:, None] ** 2
+    # Find which points are within each robot's sensing range
+    within_range = D_squared <= (R_sr ** 2)[None, :]  # (M, N)
 
-    # Mask out-of-range distances as infinity for assignment purposes
+    # Mask distances outside sensing range
     D_masked = np.where(within_range, D_squared, np.inf)
 
-    # Assign each grid point to the closest robot within its sensing range
-    robot_assignments = np.argmin(D_masked, axis=0)  # Robot responsible for each cell (M,)
+    # Assign each point to the nearest robot within range
+    robot_assignments = np.argmin(D_masked, axis=1)  # (M,)
 
-    # Compute range-limited cost and centroids of Voronoi regions
-    range_limited_cost = 0
-    c_v = np.zeros((N, 2))  # Centroid vector for each robot
-    w_v = np.zeros(N)  # Weight vector for each robot
+    # Initialize cost components
+    covered_cost = 0.0
+    uncovered_penalty = 0.0
+
+    # Calculate covered cost and centroids
+    c_v = np.zeros((N, 2))
+    w_v = np.zeros(N)
 
     for i in range(N):
-        mask_i = (robot_assignments == i) & within_range[i]
-        if np.any(mask_i):  # If any grid points are assigned to this robot
-            distances_squared_i = D_squared[i][mask_i]
-            weights_i = weight_function(distances_squared_i, R_sr[i])
+        # Points assigned to this robot AND within its range
+        valid_points = (robot_assignments == i) & within_range[:, i]
 
-            # Compute covered region cost (integral over Voronoi ∩ B(p_i,R))
-            covered_cost = np.sum(phi_q[mask_i] * weights_i * distances_squared_i * res ** 2)
-            range_limited_cost += covered_cost
+        if np.any(valid_points):
+            # Get distances and weights for valid points
+            dist_sq = D_squared[valid_points, i]
+            weights = weight_function(dist_sq, R_sr[i])
 
-            # Compute centroid of the range-limited Voronoi region
-            c_v[i] += np.sum(grid_points[:, mask_i] * phi_q[mask_i] * weights_i[None], axis=1)
-            w_v[i] += np.sum(phi_q[mask_i] * weights_i)
+            # Covered cost component
+            covered_cost += np.sum(phi_q[valid_points] * weights * dist_sq) * (res ** 2)
 
-        if w_v[i] > 0:
-            c_v[i] /= w_v[i]
+            # Centroid calculation
+            c_v[i] = np.sum(grid_points[:, valid_points] * phi_q[valid_points] * weights, axis=1)
+            w_v[i] = np.sum(phi_q[valid_points] * weights)
 
-    cost_list.append(range_limited_cost)
+            if w_v[i] > 1e-6:
+                c_v[i] /= w_v[i]
+            else:
+                c_v[i] = x_si[:, i]  # Fallback to current position
 
-    # Compute control inputs (velocities) based on centroids
+        # Penalty for points in Voronoi cell but outside sensing range
+        voronoi_points = (robot_assignments == i)
+        out_of_range = voronoi_points & ~within_range[:, i]
+
+        if np.any(out_of_range):
+            penalty = np.sum(phi_q[out_of_range] * (R_sr[i] ** 2)) * (res ** 2)
+            uncovered_penalty += penalty
+
+    # Total cost including both components
+    total_cost = covered_cost + uncovered_penalty
+    cost_history.append(total_cost)
+
+    # Compute control inputs
     si_velocities = np.zeros((2, N))
 
     for i in range(N):
-        if w_v[i] > 0:
-            centroid = c_v[i]
-            velocity = k_gain * (centroid - x_si[:, i])
+        if w_v[i] > 1e-6:
+            # Calculate desired velocity
+            desired_velocity = k_gain * (c_v[i] - x_si[:, i])
 
-            # Scale velocity based on max speed of the robot
-            si_velocities[:, i] = velocity / max(np.linalg.norm(velocity), Vr[i])
+            # Improved velocity scaling with safety check
+            norm = np.linalg.norm(desired_velocity)
+            if norm > 1e-6:  # Avoid division by zero
+                scaling_factor = min(Vr[i] / norm, 1.0)
+                si_velocities[:, i] = desired_velocity * scaling_factor
+        else:
+            # No valid points - stop the robot
+            si_velocities[:, i] = np.zeros(2)
 
-    dxu = si_to_uni_dyn(si_velocities, x)  # Transform SI to unicycle dynamics
+    # Transform to unicycle velocities
+    dxu = si_to_uni_dyn(si_velocities, x)
 
+    # Set velocities and step simulation
     try:
-        r.set_velocities(np.arange(N), dxu)  # Set velocities of agents
-        r.step()  # Step simulation forward
+        r.set_velocities(np.arange(N), dxu)
+        r.step()
 
-        print(f"Iteration {k}: Cost={range_limited_cost:.6f}, Centroids={c_v}, Weights={w_v}")
+        # Enhanced convergence check
+        if k >= MIN_ITERATIONS:
+            smoothed_cost = np.mean(cost_history[-10:])
+            if prev_smoothed_cost is not None:
+                rel_change = abs(smoothed_cost - prev_smoothed_cost) / max(abs(prev_smoothed_cost), 1e-6)
 
-        smoothed_cost = (
-            np.mean(cost_list[-10:]) if len(cost_list) > 10 else range_limited_cost
-        )
+                if rel_change < CONVERGENCE_THRESHOLD:
+                    print(f"Converged at iteration {k} with relative change {rel_change:.6f}")
+                    break
+            prev_smoothed_cost = smoothed_cost
 
-        if k > 10 and prev_cost is not None:
-            relative_change = abs(smoothed_cost - prev_cost) / max(prev_cost, 1e-10)
-
-            if relative_change < 1e-3:  # Convergence condition based on relative change in cost
-                print(f"Converged at iteration {k} with relative change {relative_change:.6f}")
-                break
-
-        prev_cost = smoothed_cost
+        # Detailed debugging output
+        print(f"Iter {k:03d}: Cost = {total_cost:.3f} | "
+              f"Δ = {rel_change:.2e}" if k > MIN_ITERATIONS else f"Iter {k:03d}: Cost = {total_cost:.3f}")
+        print(f"Robot Positions:\n{np.round(x_si, 3)}")
+        print(f"Velocities:\n{np.round(si_velocities, 3)}\n")
 
     except Exception as e:
-        print(f"Simulation terminated early at iteration {k} due to: {e}")
+        print(f"Error at iter {k}: {str(e)}")
         break
 
-# Save cost data for analysis
-df_costs = pd.DataFrame(cost_list)
-df_costs.to_csv('range_only_coverage_debugged.csv', index=False)
-
+# Save results and cleanup
+pd_cost = pd.DataFrame(cost_history)
+pd_cost.to_csv("cost_case3.csv", index=False)
 r.call_at_scripts_end()
