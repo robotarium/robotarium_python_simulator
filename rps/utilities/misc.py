@@ -3,16 +3,20 @@ import matplotlib.pyplot as plt
 
 
 def generate_initial_conditions(N, spacing=0.3, width=3, height=1.8):
-    """Generates random initial conditions in an area of the specified
-    width and height at the required spacing.
-
-    N: int (number of agents)
-    spacing: double (how far apart positions can be)
-    width: double (width of area)
-    height: double (height of area)
-
-    -> 3xN numpy array (of poses)
     """
+    Generate N random 2D poses (x, y, theta) within a rectangular area,
+    with a minimum spacing between any two points.
+
+    Parameters:
+        N (int): Number of poses to generate.
+        spacing (float): Minimum distance between poses (default: 0.3).
+        width (float): Width of the rectangle (default: 3.0).
+        height (float): Height of the rectangle (default: 1.8).
+
+    Returns:
+        poses (np.ndarray): 3 x N array of poses [x; y; theta].
+    """
+
     #Check user input types
     assert isinstance(N, int), "In the function generate_initial_conditions, the number of robots (N) to generate intial conditions for must be an integer. Recieved type %r." % type(N).__name__
     assert isinstance(spacing, (float,int)), "In the function generate_initial_conditions, the minimum spacing between robots (spacing) must be an integer or float. Recieved type %r." % type(spacing).__name__
@@ -25,22 +29,38 @@ def generate_initial_conditions(N, spacing=0.3, width=3, height=1.8):
     assert width > 0, "In the function generate_initial_conditions, the width of the area to initialize robots randomly (width) must be positive. Recieved %r." % width
     assert height >0, "In the function generate_initial_conditions, the height of the area to initialize robots randomly (height) must be positive. Recieved %r." % height
 
-    x_range = int(np.floor(width/spacing))
-    y_range = int(np.floor(height/spacing))
+    # Feasibility check (conservative)
+    approx_max_points = int((width * height) / (spacing ** 2))
+    if N > approx_max_points:
+        raise ValueError(f"In the function generate_initial_conditions, "
+                         f"Cannot fit {N} points with spacing {spacing} "
+                         f"in a {width}m x {height}m area. "
+                         f"Max possible (approx): {approx_max_points}.")
 
-    assert x_range != 0, "In the function generate_initial_conditions, the space between robots (space) is too large compared to the width of the area robots are randomly initialized in (width)."
-    assert y_range != 0, "In the function generate_initial_conditions, the space between robots (space) is too large compared to the height of the area robots are randomly initialized in (height)."
-    assert x_range*y_range > N, "In the function generate_initial_conditions, it is impossible to place %r robots within a %r x %r meter area with a spacing of %r meters." % (N, width, height, spacing)
+    points = []
+    max_attempts = 10000
+    attempts = 0
 
-    choices = (np.random.choice(x_range*y_range, N, replace=False)+1)
+    while len(points) < N and attempts < max_attempts:
+        candidate = [(np.random.rand() - 0.5) * width,
+                     (np.random.rand() - 0.5) * height]
+
+        if not points:
+            points.append(candidate)
+        else:
+            dists = np.linalg.norm(np.array(points) - candidate, axis=1)
+            if np.all(dists >= spacing):
+                points.append(candidate)
+
+        attempts += 1
+
+    if len(points) < N:
+        raise RuntimeError("Could not generate enough points with the given spacing. "
+                           "Try reducing N or spacing.")
 
     poses = np.zeros((3, N))
-
-    for i, c in enumerate(choices):
-        x,y = divmod(c, y_range)
-        poses[0, i] = x*spacing - width/2
-        poses[1, i] = y*spacing - height/2
-        poses[2, i] = np.random.rand()*2*np.pi - np.pi
+    poses[0:2, :] = np.array(points).T
+    poses[2, :] = np.random.uniform(-np.pi, np.pi, N)
 
     return poses
 
