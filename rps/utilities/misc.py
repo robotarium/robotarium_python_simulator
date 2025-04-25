@@ -38,7 +38,7 @@ def generate_initial_conditions(N, spacing=0.3, width=3, height=1.8):
                          f"Max possible (approx): {approx_max_points}.")
 
     points = []
-    max_attempts = 10000
+    max_attempts = 200
     attempts = 0
 
     while len(points) < N and attempts < max_attempts:
