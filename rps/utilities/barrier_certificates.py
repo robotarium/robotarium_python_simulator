@@ -410,17 +410,17 @@ def create_unicycle_differential_drive_barrier_certificate(max_num_obstacle_poin
     projection_distance =0.05, barrier_gain = 150, safety_radius = 0.17):
     
 
-    D = np.matrix([[wheel_radius/2, wheel_radius/2], [-wheel_radius/base_length, wheel_radius/base_length]])
-    L = np.matrix([[1,0],[0,projection_distance]])* D
-    disturb = np.matrix([[-disturbance, -disturbance, disturbance, disturbance],[-disturbance, disturbance, disturbance, -disturbance]])
+    D = np.asmatrixrix([[wheel_radius/2, wheel_radius/2], [-wheel_radius/base_length, wheel_radius/base_length]])
+    L = np.asmatrixrix([[1,0],[0,projection_distance]])* D
+    disturb = np.asmatrixrix([[-disturbance, -disturbance, disturbance, disturbance],[-disturbance, disturbance, disturbance, -disturbance]])
     num_disturbs = np.size(disturb[1,:])
 
     max_num_constraints = (max_num_robots**2-max_num_robots)//2 + max_num_robots*max_num_obstacle_points
-    A = np.matrix(np.zeros([max_num_constraints, 2*max_num_robots]))
-    b = np.matrix(np.zeros([max_num_constraints, 1]))
-    Os = np.matrix(np.zeros([2,max_num_robots]))
-    ps = np.matrix(np.zeros([2,max_num_robots]))
-    Ms = np.matrix(np.zeros([2,2*max_num_robots]))
+    A = np.asmatrixrix(np.zeros([max_num_constraints, 2*max_num_robots]))
+    b = np.asmatrixrix(np.zeros([max_num_constraints, 1]))
+    Os = np.asmatrixrix(np.zeros([2,max_num_robots]))
+    ps = np.asmatrixrix(np.zeros([2,max_num_robots]))
+    Ms = np.asmatrixrix(np.zeros([2,2*max_num_robots]))
 
     def robust_barriers(dxu, x, obstacles=np.empty(0)):
 
@@ -464,7 +464,7 @@ def create_unicycle_differential_drive_barrier_certificate(max_num_obstacle_poin
             diffs = ps[:,i] - ps[:, i+1:num_robots]
             hs = np.sum(np.square(diffs),0) - safety_radius**2 # 1 by N
             h_dot_is = 2*diffs.T*MDs[:,(2*i, 2*i+1)] # N by 2
-            h_dot_js = np.matrix(np.zeros((2,num_robots - (i+1))))
+            h_dot_js = np.asmatrixrix(np.zeros((2,num_robots - (i+1))))
             h_dot_js[0, :] = -np.sum(2*np.multiply(diffs, MDs[:,2*(i+1):2*num_robots:2]), 0)
             h_dot_js[1, :] = -np.sum(2*np.multiply(diffs, MDs[:,2*(i+1)+1:2*num_robots:2]), 0)
             new_constraints = num_robots - i - 1
@@ -496,7 +496,7 @@ def create_unicycle_differential_drive_barrier_certificate(max_num_obstacle_poin
         # Solve QP program generated earlier
         L_all = np.kron(np.eye(num_robots), L)
         dxu = np.linalg.inv(D)*dxu # Convert user input to differential drive
-        vhat = np.matrix(np.reshape(dxu ,(2*num_robots,1), order='F'))
+        vhat = np.asmatrixrix(np.reshape(dxu ,(2*num_robots,1), order='F'))
         H = 2*L_all.T*L_all
         f = np.transpose(-2*np.transpose(vhat)*np.transpose(L_all)*L_all)
 
