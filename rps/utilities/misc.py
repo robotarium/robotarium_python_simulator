@@ -92,7 +92,7 @@ def at_position(states, points, position_error=0.02):
     #Check user input ranges/sizes
     assert states.shape[0] == 3, "In the at_position function, the dimension of the state of each robot (states) must be 3. Recieved %r." % states.shape[0]
     assert points.shape[0] == 2, "In the at_position function, the dimension of the checked position for each robot (points) must be 2. Recieved %r." % points.shape[0]
-    assert states.shape[1] == poses.shape[1], "In the at_position function, the number of checked points (points) must match the number of robot states provided (states). Recieved a state array of size %r x %r and desired pose array of size %r x %r." % (states.shape[0], states.shape[1], points.shape[0], points.shape[1])
+    assert states.shape[1] == points.shape[1], "In the at_position function, the number of checked points (points) must match the number of robot states provided (states). Recieved a state array of size %r x %r and desired pose array of size %r x %r." % (states.shape[0], states.shape[1], points.shape[0], points.shape[1])
 
     # Calculate position errors
     pes = np.linalg.norm(states[:2, :] - points, 2, 0)

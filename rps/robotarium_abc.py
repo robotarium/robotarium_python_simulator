@@ -61,14 +61,21 @@ class RobotariumABC(ABC):
         if self.initial_conditions.size == 0:
             self.poses = misc.generate_initial_conditions(self.number_of_robots, spacing=0.2, width=2.5, height=1.5)
         
-        self.left_led_commands = []
-        self.right_led_commands = []
+        # Sensor Measurements
+        self.distances = np.zeros((7, number_of_robots))
+        self.accelerations = np.zeros((3, number_of_robots))
+        self.orientations = np.zeros((3, number_of_robots))
+        self.magnetic_fields = np.zeros((3, number_of_robots))
+        self.initial_encoders = np.zeros((2, number_of_robots))
+        self.encoders = np.zeros((2, number_of_robots))
+
+        # Peripherals
+        self.leds = np.zeros((3, number_of_robots))
 
         # Visualization
         self.figure = []
         self.axes = []
-        self.left_led_patches = []
-        self.right_led_patches = []
+        self.led_patches = []
         self.chassis_patches = []
         self.right_wheel_patches = []
         self.left_wheel_patches = []
@@ -82,8 +89,6 @@ class RobotariumABC(ABC):
                 p = patches.Rectangle((self.poses[:2, i]+self.robot_length/2*np.array((np.cos(self.poses[2, i]+math.pi/2), np.sin(self.poses[2, i]+math.pi/2)))+\
                                                 0.04*np.array((-np.sin(self.poses[2, i]+math.pi/2), np.cos(self.poses[2, i]+math.pi/2)))), self.robot_length, self.robot_width, (self.poses[2, i] + math.pi/4) * 180/math.pi, facecolor='#FFD700', edgecolor='k')
 
-                rled = patches.Circle(self.poses[:2, i]+0.75*self.robot_length/2*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i]))+0.04*np.array((-np.sin(self.poses[2, i]+math.pi/2), np.cos(self.poses[2, i]+math.pi/2)))),
-                                       self.robot_length/2/5, fill=False)
                 lled = patches.Circle(self.poses[:2, i]+0.75*self.robot_length/2*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i]))+\
                                         0.015*np.array((-np.sin(self.poses[2, i]+math.pi/2), np.cos(self.poses[2, i]+math.pi/2)))),\
                                        self.robot_length/2/5, fill=False)
@@ -101,8 +106,7 @@ class RobotariumABC(ABC):
                 #                                4, math.sqrt(2)*0.02, self.poses[2,i]+math.pi/4, facecolor='k')
 
                 self.chassis_patches.append(p)
-                self.left_led_patches.append(lled)
-                self.right_led_patches.append(rled)
+                self.led_patches.append(lled)
                 self.right_wheel_patches.append(rw)
                 self.left_wheel_patches.append(lw)
                 # self.base_patches.append(base)
@@ -111,7 +115,6 @@ class RobotariumABC(ABC):
                 self.axes.add_patch(lw)
                 self.axes.add_patch(p)
                 self.axes.add_patch(lled)
-                self.axes.add_patch(rled)
                 # self.axes.add_patch(base)
 
             # Draw arena
@@ -135,6 +138,32 @@ class RobotariumABC(ABC):
         idxs = np.where(np.abs(velocities[1, :]) > self.max_angular_velocity)
         velocities[1, idxs] = self.max_angular_velocity*np.sign(velocities[1, idxs])
         self.velocities = velocities
+
+    def set_leds(self, ids, leds):
+        """Set the led value for each robot in ids"""
+        if not type(leds) != np.ndarray:
+            leds = np.array(ids)
+        self.leds[ids] = leds
+
+    def get_distances(self):
+        """Get the distance sensor readings for each robot"""
+        return self.distances
+    
+    def get_accelerations(self):
+        """Get the accelerometer readings for each robot"""
+        return self.accelerations
+    
+    def get_orientations(self):
+        """Get the orientation readings for each robot"""
+        return self.orientations
+    
+    def get_magnetic_fields(self):
+        """Get the magnetic field readings for each of the robots"""
+        return self.magnetic_fields
+    
+    def get_encoders(self):
+        """Get the encoder readings for each of the robots"""
+        return self.encoders - self.initial_encoders
 
     @abstractmethod
     def get_poses(self):
