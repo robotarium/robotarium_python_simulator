@@ -52,6 +52,9 @@ class RobotariumABC(ABC):
         self.robot_length = 0.095
         self.robot_width = 0.09
 
+        self.encoder_counts_per_revolution = 28.0
+        self.motor_gear_ratio = 100.37
+
         self.collision_offset = 0.025 # May want to increase this
         self.collision_diameter = 0.135
 

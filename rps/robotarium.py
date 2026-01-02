@@ -41,6 +41,14 @@ class Robotarium(RobotariumABC):
             self._checked_poses_already = True 
 
             return self.poses
+        
+        def simulate_encoder_readings(self):
+            # Simulate encoder readings based on wheel velocities
+            left_motor_angular_velocity = self._uni_to_diff(self.velocities)[0, :]
+            right_motor_angular_velocity = self._uni_to_diff(self.velocities)[1, :]
+
+            delta_encoder = self.encoder_counts_per_revolution*self.motor_gear_ratio/(2*math.pi)*np.vstack((left_motor_angular_velocity, right_motor_angular_velocity))*self.time_step
+            self.encoders += np.round(delta_encoder)
 
         def call_at_scripts_end(self):
             """Call this function at the end of scripts to display potentail errors.  
@@ -82,6 +90,9 @@ class Robotarium(RobotariumABC):
             self.poses[2, :] = self.poses[2, :] + self.time_step*self.velocities[1, :]
             # Ensure angles are wrapped
             self.poses[2, :] = np.arctan2(np.sin(self.poses[2, :]), np.cos(self.poses[2, :]))
+
+            # Simulate encoder readings
+            self.simulate_encoder_readings()
 
             # Update graphics
             if(self.show_figure):
