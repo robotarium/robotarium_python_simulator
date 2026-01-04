@@ -15,13 +15,15 @@ import rps.utilities.misc as misc
 
 class RobotariumABC(ABC):
 
-    def __init__(self, number_of_robots=-1, show_figure=True, sim_in_real_time=True, initial_conditions=np.array([])):
+    def __init__(self, number_of_robots=-1, show_figure=True, sim_in_real_time=True, initial_conditions=np.array([]), use_distance_sensors=False, obstacles=None):
 
         #Check user input types
         assert isinstance(number_of_robots,int), "The number of robots used argument (number_of_robots) provided to create the Robotarium object must be an integer type. Recieved type %r." % type(number_of_robots).__name__
         assert isinstance(initial_conditions,np.ndarray), "The initial conditions array argument (initial_conditions) provided to create the Robotarium object must be a numpy ndarray. Recieved type %r." % type(initial_conditions).__name__
         assert isinstance(show_figure,bool), "The display figure window argument (show_figure) provided to create the Robotarium object must be boolean type. Recieved type %r." % type(show_figure).__name__
         assert isinstance(sim_in_real_time,bool), "The simulation running at 0.033s per loop (sim_real_time) provided to create the Robotarium object must be boolean type. Recieved type %r." % type(show_figure).__name__
+        assert isinstance(use_distance_sensors,bool), "The use_distance_sensors argument provided to create the Robotarium object must be boolean type. Recieved type %r." % type(use_distance_sensors).__name__
+        assert isinstance(obstacles,np.ndarray), "The obstacles array argument (obstacles) provided to create the Robotarium object must be a numpy ndarray. Recieved type %r." % type(obstacles).__name__
         
         #Check user input ranges/sizes
         assert (number_of_robots >= 0 and number_of_robots <= 50), "Requested %r robots to be used when creating the Robotarium object. The deployed number of robots must be between 0 and 50." % number_of_robots 
@@ -58,6 +60,16 @@ class RobotariumABC(ABC):
         self.collision_offset = 0.025 # May want to increase this
         self.collision_diameter = 0.135
 
+        self.distance_sensors_enabled = use_distance_sensors
+        self.distance_sensor_range = 0.7  # in meters
+        self.distance_sensors_orientation = np.array([[-0.04, 0.0,  0.04, 0.05, 0.04,   0.0,   -0.04],
+                                                      [ 0.04, 0.06, 0.05, 0.0,  -0.05, -0.06, -0.04],
+                                                      [ math.pi, math.pi/2, math.pi/4, 0.0,  -math.pi/4, -math.pi/2, -math.pi]])
+        if self.distance_sensors_enabled:
+            self.distance_end_points = np.full((2, 7*number_of_robots), np.nan)  # x and y for each of the 7 sensors for each robot
+        self.distance_sensor_error = 0.03 # 3% error based on the VL53L4CD datasheet
+
+        self.obstacles = obstacles # M x 2 x 2 array of M obstacles defined by their start (left column) and end points (right column)
 
         self.velocities = np.zeros((2, number_of_robots))
         self.poses = self.initial_conditions
@@ -65,7 +77,7 @@ class RobotariumABC(ABC):
             self.poses = misc.generate_initial_conditions(self.number_of_robots, spacing=0.2, width=2.5, height=1.5)
         
         # Sensor Measurements
-        self.distances = np.zeros((7, number_of_robots))
+        self.distances = -1*np.ones((7, number_of_robots)) # Real robots return -1 if distance sensors are not enabled
         self.accelerations = np.zeros((3, number_of_robots))
         self.orientations = np.zeros((3, number_of_robots))
         self.magnetic_fields = np.zeros((3, number_of_robots))
@@ -83,6 +95,7 @@ class RobotariumABC(ABC):
         self.right_wheel_patches = []
         self.left_wheel_patches = []
         self.base_patches = []
+        self.distance_ray_patch = []
 
         if(self.show_figure):
             self.figure, self.axes = plt.subplots()
@@ -125,6 +138,10 @@ class RobotariumABC(ABC):
 
             self.axes.set_xlim(self.boundaries[0]-0.1, self.boundaries[0]+self.boundaries[2]+0.1)
             self.axes.set_ylim(self.boundaries[1]-0.1, self.boundaries[1]+self.boundaries[3]+0.1)
+
+            # Initialize distance sensor ray endpoints
+            if self.distance_sensors_enabled:
+                self.distance_ray_patch = plt.scatter(np.zeros((1, 7*self.number_of_robots)), np.zeros((1, 7*self.number_of_robots)), s=120, c='r')
 
             plt.ion()
             plt.show()

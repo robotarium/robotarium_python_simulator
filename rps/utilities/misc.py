@@ -102,6 +102,33 @@ def at_position(states, points, position_error=0.02):
 
     return done
 
+def rotation_matrix(theta):
+    """Generates 3x3 rotation matrices for unicycle poses
+    theta: 1xN numpy array (of angles)
+    -> Nx3x3 numpy array (of rotation matrices)
+
+    Notes: Used in distance sensor simulation
+    """
+
+    # Ensure theta is a 1xN numpy array
+    theta_row = np.reshape(theta, (1, theta.size))
+    c = np.cos(theta_row)
+    s = np.sin(theta_row)
+
+    # Pre-allocate 3D array
+    R = np.zeros((3, 3, theta_row.size))
+
+    R[0, 0, :] = c
+    R[0, 1, :] = -s
+    R[1, 0, :] = s
+    R[1, 1, :] = c
+    R[2, 2, :] = 1
+
+    R = np.moveaxis(R, -1, 0)  # Move N to first dimension for batch matrix multiplication
+
+    return R
+
+
 def determine_marker_size(robotarium_instance, marker_size_meters):
 
 	# Get the x and y dimension of the robotarium figure window in pixels
