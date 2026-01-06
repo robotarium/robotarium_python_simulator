@@ -69,9 +69,12 @@ class RobotariumABC(ABC):
             self.distance_end_points = np.full((2, 7*number_of_robots), np.nan)  # x and y for each of the 7 sensors for each robot
         self.distance_sensor_error = 0.03 # 3% error based on the VL53L4CD datasheet
 
+        self.imu_orientation = [[0.0594 - 0.00319], [0.0344628 - 0.0475], [0.0]] # x, y positions, and heading of IMU in robot frame (meters). Origin is assumed to be the center of the axle.
+
         self.obstacles = obstacles # M x 2 x 2 array of M obstacles defined by their start (left column) and end points (right column)
 
         self.velocities = np.zeros((2, number_of_robots))
+        self.velocities_old = np.zeros((2, number_of_robots)) # Previous robot velocities for acceleration simulation
         self.poses = self.initial_conditions
         if self.initial_conditions.size == 0:
             self.poses = misc.generate_initial_conditions(self.number_of_robots, spacing=0.2, width=2.5, height=1.5)

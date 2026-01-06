@@ -1,5 +1,6 @@
 import math
 import time
+import os
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -7,6 +8,8 @@ import matplotlib.patches as patches
 from matplotlib.lines import Line2D
 from rps.robotarium_abc import *
 from rps.utilities.misc import rotation_matrix
+import scipy.io as sio
+from scipy.interpolate import RegularGridInterpolator
 
 # Robotarium This object provides routines to interface with the Robotarium.
 #
@@ -31,6 +34,12 @@ class Robotarium(RobotariumABC):
             #Initialize steps
             self._iterations = 0
 
+            # Starting orientations of robots
+            self.starting_orientations = (2*np.random.randint(0, 2, size=(1, self.number_of_robots)) - 1) * (np.pi/2) # A robot is either facing up or down
+
+            # Initialize magnetic field simulation function handle
+            self.B = None
+
             # Draw obstacles if any
             if self.obstacles is not None:
                 num_obstacles = self.obstacles.shape[0]
@@ -39,6 +48,39 @@ class Robotarium(RobotariumABC):
                                             [self.obstacles[i,1,0], self.obstacles[i,1,1]], 
                                             linewidth=4, color='0.5')
                     self.axes.add_line(obstacle_patch)
+
+            # Initialize magnetic field grid from a mat file
+            HERE = os.path.dirname(os.path.abspath(__file__))
+            MAGNETIC_FIELD_DATA_NAME = "recorded_magnetic_fields_world_frame.mat"
+            file = os.path.join(HERE, "utilities", MAGNETIC_FIELD_DATA_NAME)
+            data = sio.loadmat(file)
+            recorded_magnetic_fields = data['recorded_magnetic_fields']
+            N_x_points = recorded_magnetic_fields['x_points'][0][0].shape[1] # 1 x N_x_points
+            N_y_points = recorded_magnetic_fields['y_points'][0][0].shape[1] # 1 x N_y_points
+            Bx = recorded_magnetic_fields['B'][0][0][0, :].reshape(N_y_points, N_x_points, order='F')  # N_y_points x N_x_points
+            By = recorded_magnetic_fields['B'][0][0][1, :].reshape(N_y_points, N_x_points, order='F')  # N_y_points x N_x_points
+            Bz = recorded_magnetic_fields['B'][0][0][2, :].reshape(N_y_points, N_x_points, order='F')  # N_y_points x N_x_points
+
+            Fx = RegularGridInterpolator((recorded_magnetic_fields['y_points'][0][0].flatten(),
+                                          recorded_magnetic_fields['x_points'][0][0].flatten()), 
+                                          Bx, 
+                                          bounds_error=False,
+                                          fill_value=None)
+            Fy = RegularGridInterpolator((recorded_magnetic_fields['y_points'][0][0].flatten(),
+                                          recorded_magnetic_fields['x_points'][0][0].flatten()), 
+                                          By, 
+                                          bounds_error=False,
+                                          fill_value=None)
+            Fz = RegularGridInterpolator((recorded_magnetic_fields['y_points'][0][0].flatten(),
+                                          recorded_magnetic_fields['x_points'][0][0].flatten()), 
+                                          Bz, 
+                                          bounds_error=False,
+                                          fill_value=None)
+            
+            self.B = lambda pose: np.vstack((Fx(np.column_stack(([pose[1, :].T, pose[0, :].T]))),
+                                             Fy(np.column_stack(([pose[1, :].T, pose[0, :].T]))),
+                                             Fz(np.column_stack(([pose[1, :].T, pose[0, :].T])))))  # 3 x N
+
 
         def get_poses(self):
             """Returns the states of the agents.
@@ -128,6 +170,74 @@ class Robotarium(RobotariumABC):
             # Convert NaN distances to -1 for consistency with real robot API
             self.distances[np.isnan(self.distances)] = -1
 
+        def simulate_imu_measurements(self):
+            # SIMULATE_IMU_MEASUREMENTS Simulates the IMU measurements
+            # based on the current robot poses and velocities.
+            #
+            #   SIMULATE_IMU_MEASUREMENTS()
+            #
+            #   Notes:
+            #       The IMU axis may need to be adjusted. It seems weird and inconsistent with the datasheet. It is now empirical yet certain.
+            #       Accelerometer axes (in robot frame):
+            #       X-axis: Left
+            #       Y-axis: Backward
+            #       Z-axis: Down
+            #
+            #       Magnetometer axes (in robot frame):
+            #       X-axis: Right
+            #       Y-axis: Forward
+            #       Z-axis: Up
+            #
+            #       Fused Orientation axes (in robot frame):
+            #       Roll: Yaw
+            #       Pitch: Roll
+            #       Yaw: Pitch
+            #
+            #       The IMU simulation is now noise-free for easier debugging.
+
+            # Simulate acceleration readings
+            linear_accelerations = ((self.velocities[0, :] - self.velocities_old[0, :])/self.time_step).reshape(1, self.number_of_robots)  # 1 x N
+            angular_accelerations = ((self.velocities[1, :] - self.velocities_old[1, :])/self.time_step).reshape(1, self.number_of_robots)  # 1 x N
+
+            linear_accelerations_3d = np.vstack((linear_accelerations, np.zeros((1, self.number_of_robots)), 9.81*np.ones((1, self.number_of_robots))))  # 3 x N
+            angular_accelerations_3d = np.vstack((np.zeros((1, self.number_of_robots)), np.zeros((1, self.number_of_robots)), angular_accelerations))  # 3 x N
+            angular_velocities_3d = np.vstack((np.zeros((1, self.number_of_robots)), np.zeros((1, self.number_of_robots)), self.velocities[1, :].reshape(1, self.number_of_robots)))  # 3 x N
+
+            axle_to_imu_vector = np.vstack((self.imu_orientation[0]*np.ones((1, self.number_of_robots)),
+                                            self.imu_orientation[1]*np.ones((1, self.number_of_robots)),
+                                            np.zeros((1, self.number_of_robots))))  # 3 x N
+            
+            # Translational acceleration + tangential acceleration + centripetal acceleration
+            imu_accelerations = linear_accelerations_3d + \
+                                np.vstack((angular_accelerations_3d[1, :]*axle_to_imu_vector[2, :] - angular_accelerations_3d[2, :]*axle_to_imu_vector[1, :],
+                                           angular_accelerations_3d[2, :]*axle_to_imu_vector[0, :] - angular_accelerations_3d[0, :]*axle_to_imu_vector[2, :],
+                                           angular_accelerations_3d[0, :]*axle_to_imu_vector[1, :] - angular_accelerations_3d[1, :]*axle_to_imu_vector[0, :])) + \
+                                angular_velocities_3d*np.sum(angular_velocities_3d*axle_to_imu_vector, axis=0) - \
+                                np.sum(angular_velocities_3d**2, axis=0)*axle_to_imu_vector  # 3 x N
+            
+            # Convert the acceleration to the IMU frame
+            imu_accelerations_sensor_frame = np.vstack((imu_accelerations[1, :],
+                                                        imu_accelerations[0, :],
+                                                        imu_accelerations[2, :]))  # 3 x N
+
+            # Add noise to the accelerometer readings
+            self.accelerations = imu_accelerations_sensor_frame  # No noise for easier debugging
+
+            # Update old velocities
+            self.velocities_old = self.velocities.copy()
+
+            # Compute magnetic field readings
+            magnetic_fields_world_frame_parallel = self.B(self.poses).T.reshape(self.number_of_robots, 3, 1)  # N x 3 x 1
+            R_rw = np.transpose(rotation_matrix(self.poses[2, :]), (0, 2, 1)) # N x 3 x 3. From world frame to robot frame
+            magnetic_fields_robot_frame_parallel = np.matmul(R_rw, magnetic_fields_world_frame_parallel) # N x 3 x 1
+            self.magnetic_fields = magnetic_fields_robot_frame_parallel.squeeze(-1).T # N x 3
+
+            # Simulate orientation readings
+            orientation_yaw = (self.poses[2, :] + self.starting_orientations.flatten())*180/math.pi  # Convert to degrees
+            orientation_pitch = np.zeros(self.number_of_robots)
+            orientation_roll = np.zeros(self.number_of_robots)
+            self.orientations = np.vstack((orientation_yaw, orientation_roll, orientation_pitch)) # Strangely, yaw is first in real robot API
+
         def call_at_scripts_end(self):
             """Call this function at the end of scripts to display potentail errors.  
             Even if you don't want to print the errors, calling this function at the
@@ -172,6 +282,13 @@ class Robotarium(RobotariumABC):
             # Simulate encoder readings
             self.simulate_encoder_readings()
 
+            # Simulate distance measurements
+            if self.distance_sensors_enabled:
+                self.simulate_distance_measurements()
+
+            # Simulate IMU measurements
+            self.simulate_imu_measurements()
+
             # Update graphics
             if(self.show_figure):
                 if(self.sim_in_real_time):
@@ -206,9 +323,7 @@ class Robotarium(RobotariumABC):
 
                 # Update distance sensor rays
                 if self.distance_sensors_enabled:
-                    self.simulate_distance_measurements()
                     self.distance_ray_patch.set_offsets(self.distance_end_points.T)
-                    # print(self.distance_end_points)
                     
 
                 self.figure.canvas.draw_idle()
