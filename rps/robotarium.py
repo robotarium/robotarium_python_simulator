@@ -157,8 +157,15 @@ class Robotarium(RobotariumABC):
                 c = f[:, 0, :].reshape(self.number_of_robots, 1, N_sensors)**2 + f[:, 1, :].reshape(self.number_of_robots, 1, N_sensors)**2 - \
                     self.robot_radius**2  # N x 1 x N_sensors. Squared magnitude of f minus robot radius squared
                 discriminant = b**2 - 4*a*c  # N x 1 x N_sensors. Discriminant of quadratic formula
-                t_circle = (-b - np.sqrt(discriminant))/(2*a)  # N x 1 x N_sensors. Parameter for intersection points on ray lines
-                parameter_on_line_circle = np.logical_and(np.logical_and(t_circle >= 0, t_circle <= 1), np.imag(t_circle) == 0)  # N x 1 x N_sensors. Check if intersection points are on the rays
+                # Only take sqrt where discriminant is non-negative; otherwise there is no real intersection.
+                # This avoids RuntimeWarning: invalid value encountered in sqrt.
+                t_circle = np.full_like(discriminant, np.nan, dtype=float)  # N x 1 x N_sensors
+                sqrt_discriminant = np.full_like(discriminant, np.nan, dtype=float)
+                real_intersection = np.logical_and(discriminant >= 0, a > 0)
+                np.sqrt(discriminant, out=sqrt_discriminant, where=real_intersection)
+                np.divide(-b - sqrt_discriminant, 2*a, out=t_circle, where=real_intersection)
+
+                parameter_on_line_circle = np.logical_and(t_circle >= 0, t_circle <= 1)  # N x 1 x N_sensors
                 valid_parameter_circle = t_circle*parameter_on_line_circle  # N x 1 x N_sensors
                 # valid_parameter_circle[~parameter_on_line_circle] = self.distance_sensor_range  # N x 1 x N_sensors. Set invalid intersections to max range
                 valid_parameter_circle[~parameter_on_line_circle] = np.nan  # N x 1 x N_sensors. Set invalid intersections to NaN
