@@ -136,9 +136,13 @@ class Robotarium(RobotariumABC):
                       q[:, 1, :].reshape(N_obstacles, 1, N_sensors)*s_all[:, 0, :].reshape(N_obstacles, 1, 1)  # num_obstacles x 1 x N_sensors
                 qxr = q[:, 0, :].reshape(N_obstacles, 1, N_sensors)*r_all[i, 1, :].reshape(1, 1, N_sensors) - \
                       q[:, 1, :].reshape(N_obstacles, 1, N_sensors)*r_all[i, 0, :].reshape(1, 1, N_sensors)  # num_obstacles x 1 x N_sensors
-                
-                t = qxs/rxs  # num_obstacles x 1 x N_sensors. % Parameter for the intersection on the sensor lines
-                u = qxr/rxs  # num_obstacles x 1 x N_sensors. % Parameter for the intersection on the obstacle lines
+
+                # Avoid divide-by-zero when the ray and obstacle segment are parallel (rxs == 0)
+                t = np.full_like(qxs, np.nan, dtype=float)  # num_obstacles x 1 x N_sensors
+                u = np.full_like(qxr, np.nan, dtype=float)  # num_obstacles x 1 x N_sensors
+                rxs_nonzero = rxs != 0
+                np.divide(qxs, rxs, out=t, where=rxs_nonzero)  # Parameter for the intersection on the sensor lines
+                np.divide(qxr, rxs, out=u, where=rxs_nonzero)  # Parameter for the intersection on the obstacle lines
 
                 parameter_on_line = np.logical_and(np.logical_and(t >= 0, t <= 1), np.logical_and(u >= 0, u <= 1)) # num_obstacles x 1 x N_sensors
                 valid_parameter = t*parameter_on_line # num_obstacles x 1 x N_sensors
@@ -160,7 +164,9 @@ class Robotarium(RobotariumABC):
                 valid_parameter_circle[~parameter_on_line_circle] = np.nan  # N x 1 x N_sensors. Set invalid intersections to NaN
                 
                 valid_parameter_all = np.vstack((valid_parameter, valid_parameter_circle))  # Combine obstacle and robot intersection parameters
-                min_parameter = np.nanmin(valid_parameter_all, axis=0).squeeze(0)  # 1 x N_sensors
+                # Avoid RuntimeWarning: All-NaN slice encountered (no intersections)
+                min_parameter = np.min(np.where(np.isnan(valid_parameter_all), np.inf, valid_parameter_all), axis=0).squeeze(0)  # 1 x N_sensors
+                min_parameter[np.isinf(min_parameter)] = np.nan
                 self.distances[:, i] = min_parameter + self.distance_sensor_error*(2*np.random.rand(1, N_sensors) - 1)  # Add noise to distance measurements
 
             # Find the endpoint of each sensor ray

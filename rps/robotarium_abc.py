@@ -186,7 +186,7 @@ class RobotariumABC(ABC):
     
     def get_encoders(self):
         """Get the encoder readings for each of the robots"""
-        return self.encoders - self.initial_encoders
+        return np.int32(self.encoders) - np.int32(self.initial_encoders)
 
     @abstractmethod
     def get_poses(self):
