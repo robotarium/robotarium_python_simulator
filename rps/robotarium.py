@@ -233,7 +233,7 @@ class Robotarium(RobotariumABC):
             self.magnetic_fields = magnetic_fields_robot_frame_parallel.squeeze(-1).T # N x 3
 
             # Simulate orientation readings
-            orientation_yaw = (self.poses[2, :] + self.starting_orientations.flatten())*180/math.pi  # Convert to degrees
+            orientation_yaw = ((np.degrees(self.poses[2, :]) + 360) + (np.degrees(self.starting_orientations.flatten()) + 360))%360  # Convert to degrees
             orientation_pitch = np.zeros(self.number_of_robots)
             orientation_roll = np.zeros(self.number_of_robots)
             self.orientations = np.vstack((orientation_yaw, orientation_roll, orientation_pitch)) # Strangely, yaw is first in real robot API
