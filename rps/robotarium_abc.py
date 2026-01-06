@@ -61,7 +61,7 @@ class RobotariumABC(ABC):
         self.collision_diameter = 0.135
 
         self.distance_sensors_enabled = use_distance_sensors
-        self.distance_sensor_range = 0.7  # in meters
+        self.distance_sensor_range = 1.2  # in meters
         self.distance_sensors_orientation = np.array([[-0.04, 0.0,  0.04, 0.05, 0.04,   0.0,   -0.04],
                                                       [ 0.04, 0.06, 0.05, 0.0,  -0.05, -0.06, -0.04],
                                                       [ math.pi, math.pi/2, math.pi/4, 0.0,  -math.pi/4, -math.pi/2, -math.pi]])
