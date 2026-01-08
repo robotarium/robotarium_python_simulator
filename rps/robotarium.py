@@ -1,10 +1,15 @@
 import math
 import time
+import os
 
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+from matplotlib.lines import Line2D
 from rps.robotarium_abc import *
+from rps.utilities.misc import rotation_matrix
+import scipy.io as sio
+from scipy.interpolate import RegularGridInterpolator
 
 # Robotarium This object provides routines to interface with the Robotarium.
 #
@@ -12,8 +17,8 @@ from rps.robotarium_abc import *
 
 class Robotarium(RobotariumABC):
 
-        def __init__(self, number_of_robots=-1, show_figure=True, sim_in_real_time = True, initial_conditions=np.array([])):
-            super().__init__(number_of_robots, show_figure, sim_in_real_time, initial_conditions)
+        def __init__(self, number_of_robots=-1, show_figure=True, sim_in_real_time = True, initial_conditions=np.array([]), use_distance_sensors=False, obstacles=np.full((1,2,2), np.nan)):
+            super().__init__(number_of_robots, show_figure, sim_in_real_time, initial_conditions, use_distance_sensors, obstacles)
 
             #Initialize some rendering variables
             self.previous_render_time = time.time()
@@ -27,7 +32,55 @@ class Robotarium(RobotariumABC):
             self._errors = {}
 
             #Initialize steps
-            self._iterations = 0 
+            self._iterations = 0
+
+            # Starting orientations of robots
+            self.starting_orientations = (2*np.random.randint(0, 2, size=(1, self.number_of_robots)) - 1) * (np.pi/2) # A robot is either facing up or down
+
+            # Initialize magnetic field simulation function handle
+            self.B = None
+
+            # Draw obstacles if any
+            if self.obstacles is not None:
+                num_obstacles = self.obstacles.shape[0]
+                for i in range(num_obstacles):
+                    obstacle_patch = Line2D([self.obstacles[i,0,0], self.obstacles[i,0,1]], 
+                                            [self.obstacles[i,1,0], self.obstacles[i,1,1]], 
+                                            linewidth=4, color='0.5')
+                    self.axes.add_line(obstacle_patch)
+
+            # Initialize magnetic field grid from a mat file
+            HERE = os.path.dirname(os.path.abspath(__file__))
+            MAGNETIC_FIELD_DATA_NAME = "recorded_magnetic_fields_world_frame.mat"
+            file = os.path.join(HERE, "utilities", MAGNETIC_FIELD_DATA_NAME)
+            data = sio.loadmat(file)
+            recorded_magnetic_fields = data['recorded_magnetic_fields']
+            N_x_points = recorded_magnetic_fields['x_points'][0][0].shape[1] # 1 x N_x_points
+            N_y_points = recorded_magnetic_fields['y_points'][0][0].shape[1] # 1 x N_y_points
+            Bx = recorded_magnetic_fields['B'][0][0][0, :].reshape(N_y_points, N_x_points, order='F')  # N_y_points x N_x_points
+            By = recorded_magnetic_fields['B'][0][0][1, :].reshape(N_y_points, N_x_points, order='F')  # N_y_points x N_x_points
+            Bz = recorded_magnetic_fields['B'][0][0][2, :].reshape(N_y_points, N_x_points, order='F')  # N_y_points x N_x_points
+
+            Fx = RegularGridInterpolator((recorded_magnetic_fields['y_points'][0][0].flatten(),
+                                          recorded_magnetic_fields['x_points'][0][0].flatten()), 
+                                          Bx, 
+                                          bounds_error=False,
+                                          fill_value=None)
+            Fy = RegularGridInterpolator((recorded_magnetic_fields['y_points'][0][0].flatten(),
+                                          recorded_magnetic_fields['x_points'][0][0].flatten()), 
+                                          By, 
+                                          bounds_error=False,
+                                          fill_value=None)
+            Fz = RegularGridInterpolator((recorded_magnetic_fields['y_points'][0][0].flatten(),
+                                          recorded_magnetic_fields['x_points'][0][0].flatten()), 
+                                          Bz, 
+                                          bounds_error=False,
+                                          fill_value=None)
+            
+            self.B = lambda pose: np.vstack((Fx(np.column_stack(([pose[1, :].T, pose[0, :].T]))),
+                                             Fy(np.column_stack(([pose[1, :].T, pose[0, :].T]))),
+                                             Fz(np.column_stack(([pose[1, :].T, pose[0, :].T])))))  # 3 x N
+
 
         def get_poses(self):
             """Returns the states of the agents.
@@ -41,6 +94,162 @@ class Robotarium(RobotariumABC):
             self._checked_poses_already = True 
 
             return self.poses
+        
+        def simulate_encoder_readings(self):
+            # Simulate encoder readings based on wheel velocities
+            left_motor_angular_velocity = self._uni_to_diff(self.velocities)[0, :]
+            right_motor_angular_velocity = self._uni_to_diff(self.velocities)[1, :]
+
+            delta_encoder = self.encoder_counts_per_revolution*self.motor_gear_ratio/(2*math.pi)*np.vstack((left_motor_angular_velocity, right_motor_angular_velocity))*self.time_step
+            self.encoders += np.round(delta_encoder)
+
+        def simulate_distance_measurements(self):
+            # Simualte distance measurements based on robot poses
+            N_sensors = self.distance_sensors_orientation.shape[1]
+            N_obstacles = self.obstacles.shape[0]
+            self.distances = -1*np.ones((N_sensors, self.number_of_robots))  # Reset distances
+
+            # Find global positions and orientations of distance sensors
+            R = rotation_matrix(self.poses[2, :]) # N x 3 x 3
+            poses = self.poses.T[:, :, None] # N x 3 x 1 for batch matrix multiplication
+            global_sensors = poses + np.matmul(R, self.distance_sensors_orientation)  # N x 3 x 7
+
+            # Calculate the endpoints of each sensor ray at max range
+            R_sensor = rotation_matrix(global_sensors[:, 2, :]) # N x 3 x 3
+            max_distances = np.stack([self.distance_sensor_range*np.ones((self.number_of_robots*N_sensors, 1)),
+                                      np.zeros((self.number_of_robots*N_sensors, 1)),
+                                      np.zeros((self.number_of_robots*N_sensors, 1))], axis = 1) # 7*N x 3 x 1
+            sensor_endpoints_local = np.matmul(R_sensor, max_distances).squeeze(-1).reshape(self.number_of_robots, N_sensors, 3).transpose(0, 2, 1)  # N x 3 x 7
+            sensor_endpoints = global_sensors[:, 0:2, :] + sensor_endpoints_local[:, 0:2, :]  # N x 2 x 7
+            self.distance_end_points = sensor_endpoints.transpose(1, 0, 2).reshape(2, self.number_of_robots*N_sensors) # 2 x N*7
+
+            # Compute intersections of each sensor ray with each obstacle
+            r_all = sensor_endpoints - global_sensors[:, 0:2, :]  # N x 2 x 7. Vectors from sensor origin to max range endpoint
+            s_all = self.obstacles[:, :, 1] - self.obstacles[:, :, 0]  # N x 2 x 2. Vectors from start to end of each obstacle edge
+            s_all = s_all.reshape(N_obstacles, 2, 1) # num_obstacle x 2 x 1 for batch matrix multiplication
+
+            for i in range(self.number_of_robots):
+                rxs = r_all[i, 0, :].reshape(1, 1, N_sensors)*s_all[:, 1, :].reshape(N_obstacles, 1, 1) - \
+                      r_all[i, 1, :].reshape(1, 1, N_sensors)*s_all[:, 0, :].reshape(N_obstacles, 1, 1)  # num_obstacles x 1 x N_sensors
+                q = self.obstacles[:, :, 0].reshape(N_obstacles, 2, 1) - global_sensors[i, 0:2, :].reshape(1, 2, 7)  # num_obstacles x 2 x N_sensors
+                qxs = q[:, 0, :].reshape(N_obstacles, 1, N_sensors)*s_all[:, 1, :].reshape(N_obstacles, 1, 1) - \
+                      q[:, 1, :].reshape(N_obstacles, 1, N_sensors)*s_all[:, 0, :].reshape(N_obstacles, 1, 1)  # num_obstacles x 1 x N_sensors
+                qxr = q[:, 0, :].reshape(N_obstacles, 1, N_sensors)*r_all[i, 1, :].reshape(1, 1, N_sensors) - \
+                      q[:, 1, :].reshape(N_obstacles, 1, N_sensors)*r_all[i, 0, :].reshape(1, 1, N_sensors)  # num_obstacles x 1 x N_sensors
+
+                # Avoid divide-by-zero when the ray and obstacle segment are parallel (rxs == 0)
+                t = np.full_like(qxs, np.nan, dtype=float)  # num_obstacles x 1 x N_sensors
+                u = np.full_like(qxr, np.nan, dtype=float)  # num_obstacles x 1 x N_sensors
+                rxs_nonzero = rxs != 0
+                np.divide(qxs, rxs, out=t, where=rxs_nonzero)  # Parameter for the intersection on the sensor lines
+                np.divide(qxr, rxs, out=u, where=rxs_nonzero)  # Parameter for the intersection on the obstacle lines
+
+                parameter_on_line = np.logical_and(np.logical_and(t >= 0, t <= 1), np.logical_and(u >= 0, u <= 1)) # num_obstacles x 1 x N_sensors
+                valid_parameter = t*parameter_on_line # num_obstacles x 1 x N_sensors
+                # valid_parameter[~parameter_on_line] = self.distance_sensor_range # num_obstacles x 1 x N_sensors. Set invalid intersections to NaN
+                valid_parameter[~parameter_on_line] = np.nan # num_obstacles x 1 x N_sensors. Set invalid intersections to NaN
+
+                # Check if any rays intersect other robots
+                f = global_sensors[i, 0:2, :].reshape(1, 2, N_sensors) - self.poses[:2, :].T.reshape(self.number_of_robots, 2, 1)  # N x 2 x N_sensors. Vectors from other robots to sensor origin
+                a = r_all[i, 0, :].reshape(1, 1, N_sensors)**2 + r_all[i, 1, :].reshape(1, 1, N_sensors)**2  # 1 x 1 x N_sensors. Squared magnitude of ray direction vectors
+                b = 2*(f[:, 0, :].reshape(self.number_of_robots, 1, N_sensors)*r_all[i, 0, :].reshape(1, 1, N_sensors) + \
+                       f[:, 1, :].reshape(self.number_of_robots, 1, N_sensors)*r_all[i, 1, :].reshape(1, 1, N_sensors))  # N x 1 x N_sensors. Dot product of 2*f and ray direction vectors
+                c = f[:, 0, :].reshape(self.number_of_robots, 1, N_sensors)**2 + f[:, 1, :].reshape(self.number_of_robots, 1, N_sensors)**2 - \
+                    self.robot_radius**2  # N x 1 x N_sensors. Squared magnitude of f minus robot radius squared
+                discriminant = b**2 - 4*a*c  # N x 1 x N_sensors. Discriminant of quadratic formula
+                # Only take sqrt where discriminant is non-negative; otherwise there is no real intersection.
+                # This avoids RuntimeWarning: invalid value encountered in sqrt.
+                t_circle = np.full_like(discriminant, np.nan, dtype=float)  # N x 1 x N_sensors
+                sqrt_discriminant = np.full_like(discriminant, np.nan, dtype=float)
+                real_intersection = np.logical_and(discriminant >= 0, a > 0)
+                np.sqrt(discriminant, out=sqrt_discriminant, where=real_intersection)
+                np.divide(-b - sqrt_discriminant, 2*a, out=t_circle, where=real_intersection)
+
+                parameter_on_line_circle = np.logical_and(t_circle >= 0, t_circle <= 1)  # N x 1 x N_sensors
+                valid_parameter_circle = t_circle*parameter_on_line_circle  # N x 1 x N_sensors
+                # valid_parameter_circle[~parameter_on_line_circle] = self.distance_sensor_range  # N x 1 x N_sensors. Set invalid intersections to max range
+                valid_parameter_circle[~parameter_on_line_circle] = np.nan  # N x 1 x N_sensors. Set invalid intersections to NaN
+                
+                valid_parameter_all = np.vstack((valid_parameter, valid_parameter_circle))  # Combine obstacle and robot intersection parameters
+                # Avoid RuntimeWarning: All-NaN slice encountered (no intersections)
+                min_parameter = np.min(np.where(np.isnan(valid_parameter_all), np.inf, valid_parameter_all), axis=0).squeeze(0)  # 1 x N_sensors
+                min_parameter[np.isinf(min_parameter)] = np.nan
+                self.distances[:, i] = min_parameter + self.distance_sensor_error*(2*np.random.rand(1, N_sensors) - 1)  # Add noise to distance measurements
+
+            # Find the endpoint of each sensor ray
+            distance_end_points = global_sensors[:, 0:2, :] + self.distances.T.reshape(self.number_of_robots, 1, N_sensors)*r_all # N x 2 x 7
+            self.distance_end_points = distance_end_points.transpose(1, 0, 2).reshape(2, self.number_of_robots*N_sensors) # 2 x N*7
+
+            # Convert NaN distances to -1 for consistency with real robot API
+            self.distances[np.isnan(self.distances)] = -1
+
+        def simulate_imu_measurements(self):
+            # SIMULATE_IMU_MEASUREMENTS Simulates the IMU measurements
+            # based on the current robot poses and velocities.
+            #
+            #   SIMULATE_IMU_MEASUREMENTS()
+            #
+            #   Notes:
+            #       The IMU axis may need to be adjusted. It seems weird and inconsistent with the datasheet. It is now empirical yet certain.
+            #       Accelerometer axes (in robot frame):
+            #       X-axis: Left
+            #       Y-axis: Backward
+            #       Z-axis: Down
+            #
+            #       Magnetometer axes (in robot frame):
+            #       X-axis: Right
+            #       Y-axis: Forward
+            #       Z-axis: Up
+            #
+            #       Fused Orientation axes (in robot frame):
+            #       Roll: Yaw
+            #       Pitch: Roll
+            #       Yaw: Pitch
+            #
+            #       The IMU simulation is now noise-free for easier debugging.
+
+            # Simulate acceleration readings
+            linear_accelerations = ((self.velocities[0, :] - self.velocities_old[0, :])/self.time_step).reshape(1, self.number_of_robots)  # 1 x N
+            angular_accelerations = ((self.velocities[1, :] - self.velocities_old[1, :])/self.time_step).reshape(1, self.number_of_robots)  # 1 x N
+
+            linear_accelerations_3d = np.vstack((linear_accelerations, np.zeros((1, self.number_of_robots)), 9.81*np.ones((1, self.number_of_robots))))  # 3 x N
+            angular_accelerations_3d = np.vstack((np.zeros((1, self.number_of_robots)), np.zeros((1, self.number_of_robots)), angular_accelerations))  # 3 x N
+            angular_velocities_3d = np.vstack((np.zeros((1, self.number_of_robots)), np.zeros((1, self.number_of_robots)), self.velocities[1, :].reshape(1, self.number_of_robots)))  # 3 x N
+
+            axle_to_imu_vector = np.vstack((self.imu_orientation[0]*np.ones((1, self.number_of_robots)),
+                                            self.imu_orientation[1]*np.ones((1, self.number_of_robots)),
+                                            np.zeros((1, self.number_of_robots))))  # 3 x N
+            
+            # Translational acceleration + tangential acceleration + centripetal acceleration
+            imu_accelerations = linear_accelerations_3d + \
+                                np.vstack((angular_accelerations_3d[1, :]*axle_to_imu_vector[2, :] - angular_accelerations_3d[2, :]*axle_to_imu_vector[1, :],
+                                           angular_accelerations_3d[2, :]*axle_to_imu_vector[0, :] - angular_accelerations_3d[0, :]*axle_to_imu_vector[2, :],
+                                           angular_accelerations_3d[0, :]*axle_to_imu_vector[1, :] - angular_accelerations_3d[1, :]*axle_to_imu_vector[0, :])) + \
+                                angular_velocities_3d*np.sum(angular_velocities_3d*axle_to_imu_vector, axis=0) - \
+                                np.sum(angular_velocities_3d**2, axis=0)*axle_to_imu_vector  # 3 x N
+            
+            # Convert the acceleration to the IMU frame
+            imu_accelerations_sensor_frame = np.vstack((imu_accelerations[1, :],
+                                                        imu_accelerations[0, :],
+                                                        imu_accelerations[2, :]))  # 3 x N
+
+            # Add noise to the accelerometer readings
+            self.accelerations = imu_accelerations_sensor_frame  # No noise for easier debugging
+
+            # Update old velocities
+            self.velocities_old = self.velocities.copy()
+
+            # Compute magnetic field readings
+            magnetic_fields_world_frame_parallel = self.B(self.poses).T.reshape(self.number_of_robots, 3, 1)  # N x 3 x 1
+            R_rw = np.transpose(rotation_matrix(self.poses[2, :]), (0, 2, 1)) # N x 3 x 3. From world frame to robot frame
+            magnetic_fields_robot_frame_parallel = np.matmul(R_rw, magnetic_fields_world_frame_parallel) # N x 3 x 1
+            self.magnetic_fields = magnetic_fields_robot_frame_parallel.squeeze(-1).T # N x 3
+
+            # Simulate orientation readings
+            orientation_yaw = ((np.degrees(self.poses[2, :]) + 360) + (np.degrees(self.starting_orientations.flatten()) + 360))%360  # Convert to degrees
+            orientation_pitch = np.zeros(self.number_of_robots)
+            orientation_roll = np.zeros(self.number_of_robots)
+            self.orientations = np.vstack((orientation_yaw, orientation_roll, orientation_pitch)) # Strangely, yaw is first in real robot API
 
         def call_at_scripts_end(self):
             """Call this function at the end of scripts to display potentail errors.  
@@ -83,6 +292,16 @@ class Robotarium(RobotariumABC):
             # Ensure angles are wrapped
             self.poses[2, :] = np.arctan2(np.sin(self.poses[2, :]), np.cos(self.poses[2, :]))
 
+            # Simulate encoder readings
+            self.simulate_encoder_readings()
+
+            # Simulate distance measurements
+            if self.distance_sensors_enabled:
+                self.simulate_distance_measurements()
+
+            # Simulate IMU measurements
+            self.simulate_imu_measurements()
+
             # Update graphics
             if(self.show_figure):
                 if(self.sim_in_real_time):
@@ -114,6 +333,10 @@ class Robotarium(RobotariumABC):
                     self.led_patches[i].center = self.poses[:2, i]+0.75*self.robot_length/2*np.array((np.cos(self.poses[2,i]), np.sin(self.poses[2,i])))-\
                                     0.015*np.array((-np.sin(self.poses[2, i]), np.cos(self.poses[2, i]))) + self.robot_length/2*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i])))
                     # self.base_patches[i].center = self.poses[:2, i]
+
+                # Update distance sensor rays
+                if self.distance_sensors_enabled:
+                    self.distance_ray_patch.set_offsets(self.distance_end_points.T)
                     
 
                 self.figure.canvas.draw_idle()
