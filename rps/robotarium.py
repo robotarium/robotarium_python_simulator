@@ -8,6 +8,7 @@ import matplotlib.patches as patches
 from matplotlib.lines import Line2D
 from rps.robotarium_abc import *
 from rps.utilities.misc import rotation_matrix
+from rps.utilities.magnetic_fields import MAGNETIC_FIELD_X, MAGNETIC_FIELD_Y, BX, BY, BZ
 import scipy.io as sio
 from scipy.interpolate import RegularGridInterpolator
 
@@ -51,29 +52,24 @@ class Robotarium(RobotariumABC):
                         self.axes.add_line(obstacle_patch)
 
             # Initialize magnetic field grid from a mat file
-            HERE = os.path.dirname(os.path.abspath(__file__))
-            MAGNETIC_FIELD_DATA_NAME = "recorded_magnetic_fields_world_frame.mat"
-            file = os.path.join(HERE, "utilities", MAGNETIC_FIELD_DATA_NAME)
-            data = sio.loadmat(file)
-            recorded_magnetic_fields = data['recorded_magnetic_fields']
-            N_x_points = recorded_magnetic_fields['x_points'][0][0].shape[1] # 1 x N_x_points
-            N_y_points = recorded_magnetic_fields['y_points'][0][0].shape[1] # 1 x N_y_points
-            Bx = recorded_magnetic_fields['B'][0][0][0, :].reshape(N_y_points, N_x_points, order='F')  # N_y_points x N_x_points
-            By = recorded_magnetic_fields['B'][0][0][1, :].reshape(N_y_points, N_x_points, order='F')  # N_y_points x N_x_points
-            Bz = recorded_magnetic_fields['B'][0][0][2, :].reshape(N_y_points, N_x_points, order='F')  # N_y_points x N_x_points
+            N_x_points = MAGNETIC_FIELD_X.shape[0]
+            N_y_points = MAGNETIC_FIELD_Y.shape[0]
+            Bx = BX.reshape(N_y_points, N_x_points, order="F")
+            By = BY.reshape(N_y_points, N_x_points, order="F")
+            Bz = BZ.reshape(N_y_points, N_x_points, order="F")
 
-            Fx = RegularGridInterpolator((recorded_magnetic_fields['y_points'][0][0].flatten(),
-                                          recorded_magnetic_fields['x_points'][0][0].flatten()), 
+            Fx = RegularGridInterpolator((MAGNETIC_FIELD_Y,
+                                          MAGNETIC_FIELD_X), 
                                           Bx, 
                                           bounds_error=False,
                                           fill_value=None)
-            Fy = RegularGridInterpolator((recorded_magnetic_fields['y_points'][0][0].flatten(),
-                                          recorded_magnetic_fields['x_points'][0][0].flatten()), 
+            Fy = RegularGridInterpolator((MAGNETIC_FIELD_Y,
+                                          MAGNETIC_FIELD_X), 
                                           By, 
                                           bounds_error=False,
                                           fill_value=None)
-            Fz = RegularGridInterpolator((recorded_magnetic_fields['y_points'][0][0].flatten(),
-                                          recorded_magnetic_fields['x_points'][0][0].flatten()), 
+            Fz = RegularGridInterpolator((MAGNETIC_FIELD_Y,
+                                          MAGNETIC_FIELD_X), 
                                           Bz, 
                                           bounds_error=False,
                                           fill_value=None)
