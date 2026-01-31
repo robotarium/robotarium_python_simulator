@@ -1,7 +1,7 @@
 import math
 import time
 import os
-
+    
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
@@ -41,13 +41,14 @@ class Robotarium(RobotariumABC):
             self.B = None
 
             # Draw obstacles if any
-            if self.obstacles is not None:
-                num_obstacles = self.obstacles.shape[0]
-                for i in range(num_obstacles):
-                    obstacle_patch = Line2D([self.obstacles[i,0,0], self.obstacles[i,0,1]], 
-                                            [self.obstacles[i,1,0], self.obstacles[i,1,1]], 
-                                            linewidth=4, color='0.5')
-                    self.axes.add_line(obstacle_patch)
+            if(self.show_figure):
+                if self.obstacles is not None:
+                    num_obstacles = self.obstacles.shape[0]
+                    for i in range(num_obstacles):
+                        obstacle_patch = Line2D([self.obstacles[i,0,0], self.obstacles[i,0,1]], 
+                                                [self.obstacles[i,1,0], self.obstacles[i,1,1]], 
+                                                linewidth=4, color='0.5')
+                        self.axes.add_line(obstacle_patch)
 
             # Initialize magnetic field grid from a mat file
             HERE = os.path.dirname(os.path.abspath(__file__))
