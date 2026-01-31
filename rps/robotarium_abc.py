@@ -99,10 +99,10 @@ class RobotariumABC(ABC):
         self.left_wheel_patches = []
         self.base_patches = []
         self.distance_ray_patch = []
-
+        
+        self.figure, self.axes = plt.subplots()
+        self.axes.set_axis_off()
         if(self.show_figure):
-            self.figure, self.axes = plt.subplots()
-            self.axes.set_axis_off()
             for i in range(number_of_robots):
                 # p = patches.RegularPolygon((self.poses[:2, i]), 4, math.sqrt(2)*self.robot_radius, self.poses[2,i]+math.pi/4, facecolor='#FFD700', edgecolor = 'k')
                 p = patches.Rectangle(
