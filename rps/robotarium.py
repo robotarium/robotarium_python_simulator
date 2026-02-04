@@ -242,6 +242,13 @@ class Robotarium(RobotariumABC):
             magnetic_fields_robot_frame_parallel = np.matmul(R_rw, magnetic_fields_world_frame_parallel) # N x 3 x 1
             self.magnetic_fields = magnetic_fields_robot_frame_parallel.squeeze(-1).T # N x 3
 
+            # Compute Gyro Readings (The 0.00175 std is the radians standard deviation from the bno055 datashset)
+            gyro_noise = np.array([np.random.normal(0, 0.00175) for _ in range(self.number_of_robots)])
+            gyro_z = self.velocities[1, :] + gyro_noise
+            gyro_x = np.zeros(self.number_of_robots)
+            gyro_y = np.zeros(self.number_of_robots)
+            self.gyros = np.vstack((gyro_x, gyro_y, gyro_z))
+
             # Simulate orientation readings
             orientation_yaw = ((np.degrees(self.poses[2, :]) + 360) + (np.degrees(self.starting_orientations.flatten()) + 360))%360  # Convert to degrees
             orientation_pitch = np.zeros(self.number_of_robots)
