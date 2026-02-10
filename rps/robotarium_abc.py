@@ -23,7 +23,8 @@ class RobotariumABC(ABC):
         assert isinstance(show_figure,bool), "The display figure window argument (show_figure) provided to create the Robotarium object must be boolean type. Recieved type %r." % type(show_figure).__name__
         assert isinstance(sim_in_real_time,bool), "The simulation running at 0.033s per loop (sim_real_time) provided to create the Robotarium object must be boolean type. Recieved type %r." % type(show_figure).__name__
         assert isinstance(use_distance_sensors,bool), "The use_distance_sensors argument provided to create the Robotarium object must be boolean type. Recieved type %r." % type(use_distance_sensors).__name__
-        assert isinstance(obstacles,np.ndarray), "The obstacles array argument (obstacles) provided to create the Robotarium object must be a numpy ndarray. Recieved type %r." % type(obstacles).__name__
+        if obstacles is not None:
+            assert isinstance(obstacles,np.ndarray), "The obstacles array argument (obstacles) provided to create the Robotarium object must be a numpy ndarray. Recieved type %r." % type(obstacles).__name__
         
         #Check user input ranges/sizes
         assert (number_of_robots >= 0 and number_of_robots <= 50), "Requested %r robots to be used when creating the Robotarium object. The deployed number of robots must be between 0 and 50." % number_of_robots 
@@ -84,6 +85,7 @@ class RobotariumABC(ABC):
         self.accelerations = np.zeros((3, number_of_robots))
         self.orientations = np.zeros((3, number_of_robots))
         self.magnetic_fields = np.zeros((3, number_of_robots))
+        self.gyros = np.zeros((3, number_of_robots))
         self.initial_encoders = np.zeros((2, number_of_robots))
         self.encoders = np.zeros((2, number_of_robots))
 
@@ -171,9 +173,7 @@ class RobotariumABC(ABC):
 
     def set_leds(self, ids, leds):
         """Set the led value for each robot in ids"""
-        if not type(leds) != np.ndarray:
-            leds = np.array(ids)
-        self.leds[ids] = leds
+        return
 
     def get_distances(self):
         """Get the distance sensor readings for each robot"""
@@ -190,6 +190,10 @@ class RobotariumABC(ABC):
     def get_magnetic_fields(self):
         """Get the magnetic field readings for each of the robots"""
         return self.magnetic_fields
+    
+    def get_gyros(self):
+        """Get the gyro readings for each of the robots"""
+        return self.gyros
     
     def get_encoders(self):
         """Get the encoder readings for each of the robots"""
