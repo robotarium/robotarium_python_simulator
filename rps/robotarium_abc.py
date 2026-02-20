@@ -63,12 +63,15 @@ class RobotariumABC(ABC):
 
         self.distance_sensors_enabled = use_distance_sensors
         self.distance_sensor_range = 1.2  # in meters
+        
         self.distance_sensors_orientation = np.array([[-0.04, 0.0,  0.04, 0.05, 0.04,   0.0,   -0.04],
                                                       [ 0.04, 0.06, 0.05, 0.0,  -0.05, -0.06, -0.04],
                                                       [ math.pi, math.pi/2, math.pi/4, 0.0,  -math.pi/4, -math.pi/2, -math.pi]])
         if self.distance_sensors_enabled:
             self.distance_end_points = np.full((2, 7*number_of_robots), np.nan)  # x and y for each of the 7 sensors for each robot
         self.distance_sensor_error = 0.03 # 3% error based on the VL53L4CD datasheet
+        self.distance_sensor_dropout_prob = 0.035; # 3.5 percent of readings dropped     (TECHNICALLY ZERO AFTER MASKING THE FIRST BATCH OF READINGS?)
+        self.distance_sensor_outlier_prob = .014;   # 1.4 percent phantom readings
 
         self.imu_orientation = [[0.0594 - 0.00319], [0.0344628 - 0.0475], [0.0]] # x, y positions, and heading of IMU in robot frame (meters). Origin is assumed to be the center of the axle.
 
@@ -178,6 +181,10 @@ class RobotariumABC(ABC):
     def get_distances(self):
         """Get the distance sensor readings for each robot"""
         return self.distances
+    
+    def transform_distance_readings(self):
+        """Get the transformed end points in global Robotarium coordinates from distance sensor readings"""
+        return self.distance_end_points
     
     def get_accelerations(self):
         """Get the accelerometer readings for each robot"""
