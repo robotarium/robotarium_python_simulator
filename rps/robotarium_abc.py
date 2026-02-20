@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-
+from typing import List, Tuple
 import rps.utilities.misc as misc
 
 # RobotariumABC: This is an interface for the Robotarium class that
@@ -88,6 +88,9 @@ class RobotariumABC(ABC):
         self.gyros = np.zeros((3, number_of_robots))
         self.initial_encoders = np.zeros((2, number_of_robots))
         self.encoders = np.zeros((2, number_of_robots))
+        self.odom: List[np.ndarray] = []
+        self.odom.append(self.poses) # all odoms will start with the inital poses
+
 
         # Peripherals
         self.leds = np.zeros((3, number_of_robots))
@@ -101,6 +104,8 @@ class RobotariumABC(ABC):
         self.left_wheel_patches = []
         self.base_patches = []
         self.distance_ray_patch = []
+        self.odom_trajectory_patches = []
+
         
         self.figure, self.axes = plt.subplots()
         self.axes.set_axis_off()
