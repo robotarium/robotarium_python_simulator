@@ -101,7 +101,22 @@ class Robotarium(RobotariumABC):
             self.encoders += np.round(delta_encoder)
 
         def simulate_distance_measurements(self):
-            # Simualte distance measurements based on robot poses
+            """ Simulates the distance sensor readings for all robots in the Robotarium.
+
+            For each robot and each of its sensors, this function:
+              1. Computes the global position and orientation of the sensor.
+              2. Casts a ray in the sensor direction and finds intersections with
+                 obstacles and other robots.
+              3. Adds realistic sensor effects:
+                  - Gaussian noise around the true distance.
+                  - Random “outlier” measurements (random readings anywhere in the distance sensor range).
+                  - Random dropouts (sensor returns no measurement).
+              4. Clamps all readings to the valid sensor range and converts NaNs to -1
+                 to match the Robotarium API.
+            
+            This allows testing algorithms with realistic, noisy distance data
+            similar to what physical robots would produce. """
+            
             N_sensors = self.distance_sensors_orientation.shape[1]
             N_obstacles = self.obstacles.shape[0]
             self.distances = -1*np.ones((N_sensors, self.number_of_robots))  # Reset distances
@@ -171,7 +186,50 @@ class Robotarium(RobotariumABC):
                 # Avoid RuntimeWarning: All-NaN slice encountered (no intersections)
                 min_parameter = np.min(np.where(np.isnan(valid_parameter_all), np.inf, valid_parameter_all), axis=0).squeeze(0)  # 1 x N_sensors
                 min_parameter[np.isinf(min_parameter)] = np.nan
-                self.distances[:, i] = min_parameter + self.distance_sensor_error*(2*np.random.rand(1, N_sensors) - 1)  # Add noise to distance measurements
+                # self.distances[:, i] = min_parameter + self.distance_sensor_error*(2*np.random.rand(1, N_sensors) - 1)  # Add noise to distance measurements
+                
+                # =========================================
+                # Mixture sensor model
+                # =========================================
+
+                p_d = self.distance_sensor_dropout_prob
+                p_o = self.distance_sensor_outlier_prob
+
+                noisy_parameter = min_parameter.copy()
+                valid = ~np.isnan(min_parameter)
+
+                # Single random draw per measurement
+                u = np.random.rand(N_sensors)
+
+                # Mutually exclusive masks
+                dropout_mask = (u < p_d)
+                outlier_mask = (u >= p_d) & (u < p_d + p_o)
+                nominal_mask = (u >= p_d + p_o)
+
+                # --- Gaussian noise ---
+                nominal_valid = nominal_mask & valid
+
+                sigma = self.distance_sensor_error * min_parameter[nominal_valid]
+                noise = sigma * np.random.randn(sigma.shape[0])
+                noise = np.clip(noise, -3*sigma, 3*sigma)       # Clip Gaussian noise to ±3σ
+
+                noisy_parameter[nominal_valid] = (
+                    min_parameter[nominal_valid] + noise
+                )
+
+                # --- Outliers ---
+                outlier_valid = outlier_mask & valid
+                random_values = self.distance_sensor_range * np.random.rand(N_sensors)      # get a random reading w/ uniform prob in dist sens range
+                noisy_parameter[outlier_valid] = random_values[outlier_valid]
+
+                # --- Dropouts ---
+                noisy_parameter[dropout_mask] = np.nan
+
+                # --- Clamp valid values ---
+                valid_after = ~np.isnan(noisy_parameter)
+                noisy_parameter[valid_after] = np.clip(noisy_parameter[valid_after], 0, self.distance_sensor_range)
+
+                self.distances[:, i] = noisy_parameter
 
             # Find the endpoint of each sensor ray
             distance_end_points = global_sensors[:, 0:2, :] + self.distances.T.reshape(self.number_of_robots, 1, N_sensors)*r_all # N x 2 x 7
