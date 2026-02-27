@@ -108,7 +108,7 @@ def run_ekf_experiment(total_waypoints: int = 20,
 
     for waypoint in goal_points.T: # while not all waypoints have been reached
         print(f"Next waypoint: {waypoint.reshape(3, 1)}")
-        while at_pose(x, waypoint.reshape(3, 1))[0].size != N:
+        while at_pose(x, waypoint.reshape(3, 1))[0].size != N: # while not at the waypoint
             # Get poses of agents
             x = r.get_poses()
             r.get_encoders()
