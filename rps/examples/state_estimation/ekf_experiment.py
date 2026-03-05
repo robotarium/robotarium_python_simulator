@@ -14,7 +14,7 @@ Run Unicycle EKF experiment with the passed parameters.  All parameters have def
 
 Parameters:
     total_waypoints: int = 20,
-    encoder_noise: list[float] = [0.01, 0.01], # right and left encoder noise variances (not modeling at tick level), will be formed into matrix in code
+    encoder_noise: list[float] = [0.01, 0.01], # right and left encoder count noise variance per step (counts^2); mapped to wheel angular velocity noise for EKF M
     process_noise: list[float] = [1.0, 1.0, 1.0], # x, y, and theta process noise variances, will be formed into matrix in code
     spoof_gps_measurements: bool = False, # whether to spoof GPS measurements
     gps_measurement_interval_distribution: float = (1.0, 1.0), # distribution of GPS measurement intervals (mean, std)
@@ -29,7 +29,6 @@ Raises:
     ValueError: If the inputs are not valid
 """
 def run_ekf_experiment(total_waypoints: int = 20,
-                       encoder_noise: list[float] = [0.01, 0.01], # right and left encoder noise variances (not modeling at tick level), will be formed into matrix in code
                        process_noise: list[float] = [1.0, 1.0, 1.0], # x, y, and theta process noise variances, will be formed into matrix in code
                        spoof_gps_measurements: bool = False, # whether to spoof GPS measurements
                        gps_measurement_interval_distribution: float = (1.0, 1.0), # distribution of GPS measurement intervals (mean, std)
@@ -57,8 +56,12 @@ def run_ekf_experiment(total_waypoints: int = 20,
     base_length = r.base_length
     dt = r.time_step
 
-
-    encoder_noise_matrix = np.diag(np.array(encoder_noise))
+    # Map encoder count noise (variance per step) -> wheel angular velocity noise (rad/s)
+    # delta_phi_noise = count_noise * counts_to_rad; omega_noise = delta_phi_noise / dt
+    # => Var(omega_noise) = (counts_to_rad / dt)^2 * Var(count_noise)
+    counts_to_rad = 2 * np.pi / (r.encoder_counts_per_revolution * r.motor_gear_ratio)
+    encoder_ang_vel_var = (counts_to_rad / dt) ** 2 * r.encoder_noise_std**2
+    encoder_noise_matrix = np.eye(2) * encoder_ang_vel_var
     process_noise_matrix = np.eye(3) * np.array(process_noise)
 
     if spoof_gps_measurements:
@@ -163,12 +166,10 @@ def run_ekf_experiment(total_waypoints: int = 20,
     np.savez('ekf_experiment_results.npz', gt_history=gt_history, ekf_history=ekf_history, Pdiag_history=Pdiag_history)
     r.call_at_scripts_end()
 
-def validate_inputs(total_waypoints: int, encoder_noise: np.ndarray, process_noise: np.ndarray, spoof_gps_measurements: bool, gps_measurement_interval_distribution: float, gps_measurement_noise: np.ndarray, use_imu_measurements: bool, imu_measurement_noise: np.ndarray):
+def validate_inputs(total_waypoints: int, process_noise: np.ndarray, spoof_gps_measurements: bool, gps_measurement_interval_distribution: float, gps_measurement_noise: np.ndarray, use_imu_measurements: bool, imu_measurement_noise: np.ndarray):
     """ Validate the inputs to the run_ekf_experiment function """
     if total_waypoints < 1:
         raise ValueError("Total waypoints must be at least 1")
-    if len(encoder_noise) != 2:
-        raise ValueError("Encoder noise must be a list of length 2 with first being right wheel noise variance and second being left wheel noise variance")
     if len(process_noise) != 3:
         raise ValueError("Process noise must be a list of length 3 with first being x process noise variance, second being y process noise variance, and third being theta process noise variance")
     if spoof_gps_measurements and (len(gps_measurement_noise) != 2):
@@ -180,7 +181,6 @@ def parse_args():
     """ Parse the command line arguments """
     parser = argparse.ArgumentParser(description="Run EKF experimentation")
     parser.add_argument("--total_waypoints", type=int, default=10, help="Total waypoints")
-    parser.add_argument("--encoder_noise", type=float, nargs=2, default=[0.01, 0.01], help="Encoder noise (right, left) as a list of two floats representing the right and left wheel noise variances")
     parser.add_argument("--process_noise", type=float, nargs=3, default=[0.01, 0.01, 0.01], help="Process noise (x, y, theta) as a list of three floats representing the x, y, and theta process noise variances")
     parser.add_argument("--spoof_gps_measurements", type=bool, default=False, help="Whether to spoof GPS measurements")
     parser.add_argument("--gps_measurement_interval_distribution", type=float, nargs=2, default=[1.0, 1.0], help="GPS measurement interval distribution (mean, std) as a list")
@@ -191,10 +191,9 @@ def parse_args():
 
 def main():
     args = parse_args()
-    validate_inputs(args.total_waypoints, np.array(args.encoder_noise), np.array(args.process_noise), args.spoof_gps_measurements, args.gps_measurement_interval_distribution, np.array(args.gps_measurement_noise), args.use_imu_measurements, np.array(args.imu_measurement_noise))
+    validate_inputs(args.total_waypoints, np.array(args.process_noise), args.spoof_gps_measurements, args.gps_measurement_interval_distribution, np.array(args.gps_measurement_noise), args.use_imu_measurements, np.array(args.imu_measurement_noise))
     print(f"Inputs validated, running EKF experiment with the following parameters:")
     print(f"Total waypoints: {args.total_waypoints}")
-    print(f"Encoder noise: {args.encoder_noise}")
     print(f"Process noise: {args.process_noise}")
     print(f"Spoof GPS measurements: {args.spoof_gps_measurements}")
     print(f"GPS measurement interval distribution: {args.gps_measurement_interval_distribution}")
@@ -203,7 +202,6 @@ def main():
     print(f"IMU measurement noise: {args.imu_measurement_noise}")
     print(f"Running EKF experiment...")
     run_ekf_experiment(args.total_waypoints,
-                       args.encoder_noise,
                        args.process_noise,
                        args.spoof_gps_measurements,
                        args.gps_measurement_interval_distribution,

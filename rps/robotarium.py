@@ -99,9 +99,10 @@ class Robotarium(RobotariumABC):
 
             delta_encoder = self.encoder_counts_per_revolution*self.motor_gear_ratio/(2*math.pi)*np.vstack((left_motor_angular_velocity, right_motor_angular_velocity))*self.time_step
             
-            # add noise to the encoder readings (in count units; use small std for accurate encoders)
-            encoder_noise_std = self.encoder_noise_std
-            encoder_noise = np.random.normal(0, encoder_noise_std, delta_encoder.shape)
+            # Per-count noise: error std scales with sqrt(number of counts) in this step
+            n_counts = np.maximum(np.abs(delta_encoder), 1.0)
+            step_noise_std = self.encoder_noise_std * np.sqrt(n_counts)
+            encoder_noise = np.random.normal(0, step_noise_std, delta_encoder.shape)
             delta_encoder += encoder_noise
             self.encoders += np.round(delta_encoder)
 
