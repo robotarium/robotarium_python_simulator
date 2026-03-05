@@ -57,8 +57,8 @@ def run_ekf_experiment(total_waypoints: int = 20,
     base_length = r.base_length
     dt = r.time_step
 
-    # form covariance matrices from input tuples
-    encoder_noise_matrix = np.eye(2) * np.array(encoder_noise)
+
+    encoder_noise_matrix = np.diag(np.array(encoder_noise))
     process_noise_matrix = np.eye(3) * np.array(process_noise)
 
     if spoof_gps_measurements:
@@ -72,7 +72,7 @@ def run_ekf_experiment(total_waypoints: int = 20,
         imu_measurement_noise_matrix = None
 
     imu_measurement_noise_matrix = np.eye(3) * np.array(imu_measurement_noise)
-
+    
     # Initialize EKF
     ekf = UnicycleEKF(initial_state=initial_conditions.flatten(), 
                 initial_covariance=np.eye(3), 
@@ -106,27 +106,31 @@ def run_ekf_experiment(total_waypoints: int = 20,
     var_fig.suptitle("EKF state variances (diag(P)) - live")
     var_fig.tight_layout()
 
+    # Encoder deltas: get_encoders() returns (2, N) cumulative counts [left; right] since start
+    counts_to_rad = 2 * np.pi / (r.encoder_counts_per_revolution * r.motor_gear_ratio)
+    encoders_prev = r.get_encoders()
+
     for waypoint in goal_points.T: # while not all waypoints have been reached
         print(f"Next waypoint: {waypoint.reshape(3, 1)}")
         while at_pose(x, waypoint.reshape(3, 1))[0].size != N: # while not at the waypoint
             # Get poses of agents
             x = r.get_poses()
-            r.get_encoders()
+            encoders_curr = r.get_encoders()
 
-            # Create unicycle control inputs
+            # Create unicycle control inputs (for robot motion)
             dxu = unicycle_pose_controller(x, waypoint.reshape(3, 1))
-
-            # Create safe control inputs (i.e., no collisions)
             dxu = uni_barrier_cert(dxu, x)
 
-            # simulate encoder noise and map to velocity and angular velocity noise
-            encoder_right_std = np.sqrt(encoder_noise[0])
-            encoder_left_std = np.sqrt(encoder_noise[1])
-            v_noise = (wheel_radius / 2) * (np.random.randn()*encoder_right_std + np.random.randn()*encoder_left_std)
-            w_noise = (wheel_radius / base_length) * (np.random.randn()*encoder_right_std - np.random.randn()*encoder_left_std)
+            # v, w from encoder deltas (counts -> rad -> v, w) for EKF predict
+            delta_counts_left = encoders_curr[0, 0] - encoders_prev[0, 0]
+            delta_counts_right = encoders_curr[1, 0] - encoders_prev[1, 0]
+            delta_phi_L = delta_counts_left * counts_to_rad
+            delta_phi_R = delta_counts_right * counts_to_rad
+            v_enc = (wheel_radius / 2) * (delta_phi_R + delta_phi_L) / dt
+            w_enc = (wheel_radius / base_length) * (delta_phi_R - delta_phi_L) / dt
 
-            # Update EKF
-            ekf.predict(dxu[0, 0] + v_noise, dxu[1, 0] + w_noise, dt)  # 30 Hz update rate
+            ekf.predict(v_enc, w_enc, dt)
+            encoders_prev = encoders_curr.copy()
 
             # Store trajectories
             gt_history.append(x[:2, 0].copy())
@@ -155,6 +159,8 @@ def run_ekf_experiment(total_waypoints: int = 20,
             r.step()
 
     #Call at end of script to print debug information and for your script to run on the Robotarium server properly
+
+    np.savez('ekf_experiment_results.npz', gt_history=gt_history, ekf_history=ekf_history, Pdiag_history=Pdiag_history)
     r.call_at_scripts_end()
 
 def validate_inputs(total_waypoints: int, encoder_noise: np.ndarray, process_noise: np.ndarray, spoof_gps_measurements: bool, gps_measurement_interval_distribution: float, gps_measurement_noise: np.ndarray, use_imu_measurements: bool, imu_measurement_noise: np.ndarray):

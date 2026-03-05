@@ -57,6 +57,7 @@ class RobotariumABC(ABC):
 
         self.encoder_counts_per_revolution = 28.0
         self.motor_gear_ratio = 100.37
+        self.encoder_noise_std = 1e-4  # counts
 
         self.collision_offset = 0.025 # May want to increase this
         self.collision_diameter = 0.135

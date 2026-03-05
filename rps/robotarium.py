@@ -98,6 +98,11 @@ class Robotarium(RobotariumABC):
             right_motor_angular_velocity = self._uni_to_diff(self.velocities)[1, :]
 
             delta_encoder = self.encoder_counts_per_revolution*self.motor_gear_ratio/(2*math.pi)*np.vstack((left_motor_angular_velocity, right_motor_angular_velocity))*self.time_step
+            
+            # add noise to the encoder readings (in count units; use small std for accurate encoders)
+            encoder_noise_std = self.encoder_noise_std
+            encoder_noise = np.random.normal(0, encoder_noise_std, delta_encoder.shape)
+            delta_encoder += encoder_noise
             self.encoders += np.round(delta_encoder)
 
         def simulate_distance_measurements(self):
