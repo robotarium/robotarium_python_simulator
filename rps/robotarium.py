@@ -104,7 +104,7 @@ class Robotarium(RobotariumABC):
             step_noise_std = self.encoder_noise_std * np.sqrt(n_counts)
             encoder_noise = np.random.normal(0, step_noise_std, delta_encoder.shape)
             delta_encoder += encoder_noise
-            self.encoders += np.round(delta_encoder)
+            self.encoders += np.round(delta_encoder) # this is another source of noise with an std of 0.5
 
         def simulate_distance_measurements(self):
             """ Simulates the distance sensor readings for all robots in the Robotarium.
