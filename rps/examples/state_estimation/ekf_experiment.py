@@ -31,7 +31,7 @@ Raises:
 def run_ekf_experiment(total_waypoints: int = 20,
                        process_noise: list[float] = [1.0, 1.0, 1.0], # x, y, and theta process noise variances, will be formed into matrix in code
                        spoof_gps_measurements: bool = False, # whether to spoof GPS measurements
-                       gps_measurement_interval_distribution: float = (1.0, 1.0), # distribution of GPS measurement intervals (mean, std)
+                       gps_measurement_interval_distribution: float = (2.0, 1.0), # distribution of GPS measurement intervals (mean, std)
                        gps_measurement_noise: list[float] = [0.1, 0.1], # x and y GPS measurement noise variances, will be formed into matrix in code
                        use_imu_measurements: bool = False, # will arrive on every tick if true, otherwise not used
                        imu_measurement_noise: list[float] = [0.01, 0.01, 0.01]): # acc_x, acc_y, and yaw rate IMU measurement noise variances, will be formed into matrix in code
@@ -60,7 +60,7 @@ def run_ekf_experiment(total_waypoints: int = 20,
     # delta_phi_noise = count_noise * counts_to_rad; omega_noise = delta_phi_noise / dt
     # => Var(omega_noise) = (counts_to_rad / dt)^2 * Var(count_noise)
     counts_to_rad = 2 * np.pi / (r.encoder_counts_per_revolution * r.motor_gear_ratio)
-    encoder_ang_vel_var = (counts_to_rad / dt) ** 2 * r.encoder_noise_std**2
+    encoder_ang_vel_var = (counts_to_rad / dt) ** 2 * (r.encoder_noise_std + 0.29) **2 # 0.29 is std from rounding of enocoder readings
     encoder_noise_matrix = np.eye(2) * encoder_ang_vel_var
     process_noise_matrix = np.eye(3) * np.array(process_noise)
 
@@ -113,6 +113,8 @@ def run_ekf_experiment(total_waypoints: int = 20,
     counts_to_rad = 2 * np.pi / (r.encoder_counts_per_revolution * r.motor_gear_ratio)
     encoders_prev = r.get_encoders()
 
+    current_time = time.time()
+    next_gps_measurement_time = current_time + np.random.normal(gps_measurement_interval_distribution[0], gps_measurement_interval_distribution[1])
     for waypoint in goal_points.T: # while not all waypoints have been reached
         print(f"Next waypoint: {waypoint.reshape(3, 1)}")
         while at_pose(x, waypoint.reshape(3, 1))[0].size != N: # while not at the waypoint
@@ -123,6 +125,13 @@ def run_ekf_experiment(total_waypoints: int = 20,
             # Create unicycle control inputs (for robot motion)
             dxu = unicycle_pose_controller(x, waypoint.reshape(3, 1))
             dxu = uni_barrier_cert(dxu, x)
+
+            current_time = time.time()
+            if current_time >= next_gps_measurement_time:
+                gps_measurement = x[:2, 0] + np.random.normal(0, gps_measurement_noise[0], 2)
+                ekf.update_gps(gps_measurement)
+                print(f"GPS measurement: {gps_measurement}")
+                next_gps_measurement_time = current_time + np.random.normal(gps_measurement_interval_distribution[0], gps_measurement_interval_distribution[1])
 
             # v, w from encoder deltas (counts -> rad -> v, w) for EKF predict
             delta_counts_left = encoders_curr[0, 0] - encoders_prev[0, 0]
@@ -182,7 +191,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Run EKF experimentation")
     parser.add_argument("--total_waypoints", type=int, default=10, help="Total waypoints")
     parser.add_argument("--process_noise", type=float, nargs=3, default=[0.01, 0.01, 0.01], help="Process noise (x, y, theta) as a list of three floats representing the x, y, and theta process noise variances")
-    parser.add_argument("--spoof_gps_measurements", type=bool, default=False, help="Whether to spoof GPS measurements")
+    parser.add_argument("--spoof_gps_measurements", action='store_true', default=False, help="Whether to spoof GPS measurements")
     parser.add_argument("--gps_measurement_interval_distribution", type=float, nargs=2, default=[1.0, 1.0], help="GPS measurement interval distribution (mean, std) as a list")
     parser.add_argument("--gps_measurement_noise", type=float, nargs=2, default=[0.01, 0.01], help="GPS measurement noise (x, y) as a list")
     parser.add_argument("--use_imu_measurements", type=bool, default=False, help="Whether to use IMU measurements")
