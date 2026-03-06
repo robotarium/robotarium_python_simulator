@@ -29,10 +29,10 @@ Raises:
     ValueError: If the inputs are not valid
 """
 def run_ekf_experiment(total_waypoints: int = 20,
-                       process_noise: list[float] = [1.0, 1.0, 1.0], # x, y, and theta process noise variances, will be formed into matrix in code
+                       process_noise: list[float] = [0.001, 0.001, 0.001], # x, y, and theta process noise variances, will be formed into matrix in code
                        spoof_gps_measurements: bool = False, # whether to spoof GPS measurements
-                       gps_measurement_interval_distribution: float = (2.0, 1.0), # distribution of GPS measurement intervals (mean, std)
-                       gps_measurement_noise: list[float] = [0.1, 0.1], # x and y GPS measurement noise variances, will be formed into matrix in code
+                       gps_measurement_interval_distribution: float = (3.0, 1.0), # distribution of GPS measurement intervals (mean, std)
+                       gps_measurement_noise: list[float] = [0.05, 0.05], # x and y GPS measurement noise variances, will be formed into matrix in code
                        use_imu_measurements: bool = False, # will arrive on every tick if true, otherwise not used
                        imu_measurement_noise: list[float] = [0.01, 0.01, 0.01]): # acc_x, acc_y, and yaw rate IMU measurement noise variances, will be formed into matrix in code
 
@@ -78,7 +78,7 @@ def run_ekf_experiment(total_waypoints: int = 20,
     
     # Initialize EKF
     ekf = UnicycleEKF(initial_state=initial_conditions.flatten(), 
-                initial_covariance=np.eye(3), 
+                initial_covariance=np.zeros((3, 3)), 
                 b=base_length, 
                 r=wheel_radius, 
                 M=encoder_noise_matrix, 
@@ -89,11 +89,13 @@ def run_ekf_experiment(total_waypoints: int = 20,
     # Plotting setup
     gt_trail, = r.axes.plot([], [], 'b-', linewidth=1.5, label='Ground Truth')
     ekf_trail, = r.axes.plot([], [], 'r--', linewidth=1.5, label='EKF Estimate')
-    r.axes.legend(loc='upper left', fontsize=determine_font_size(r, 0.05))
+    gps_scatter = r.axes.scatter([], [], marker='x', s=80, c='green', linewidths=2, label=f'Spoofed GPS (std={np.sqrt(np.array(gps_measurement_noise))}, interval={gps_measurement_interval_distribution[0]:.1f} ± {gps_measurement_interval_distribution[1]:.1f} s)', zorder=5)
+    r.axes.legend(loc='upper left', fontsize=6)
 
     gt_history = []
     ekf_history = []
     Pdiag_history = []
+    gps_measurement_history = []
 
     # Live variance figure (separate from Robotarium axes)
     var_fig, var_axes = plt.subplots(3, 1, sharex=True, figsize=(7, 6))
@@ -102,11 +104,13 @@ def run_ekf_experiment(total_waypoints: int = 20,
         var_axes[1].plot([], [], label="Var(y)")[0],
         var_axes[2].plot([], [], label="Var(theta)")[0],
     ]
-    var_axes[0].set_ylabel("Var(x)")
-    var_axes[1].set_ylabel("Var(y)")
-    var_axes[2].set_ylabel("Var(theta)")
-    var_axes[2].set_xlabel("time (s)")
-    var_fig.suptitle("EKF state variances (diag(P)) - live")
+    var_axes[0].set_ylabel("Var(x)", fontsize=8)
+    var_axes[1].set_ylabel("Var(y)", fontsize=8)
+    var_axes[2].set_ylabel("Var(theta)", fontsize=8)
+    var_axes[2].set_xlabel("time (s)", fontsize=8)
+    var_fig.suptitle("EKF state variances (diag(P)) - live", fontsize=9)
+    for ax in var_axes:
+        ax.tick_params(axis='both', labelsize=7)
     var_fig.tight_layout()
 
     # Encoder deltas: get_encoders() returns (2, N) cumulative counts [left; right] since start
@@ -128,8 +132,9 @@ def run_ekf_experiment(total_waypoints: int = 20,
 
             current_time = time.time()
             if current_time >= next_gps_measurement_time:
-                gps_measurement = x[:2, 0] + np.random.normal(0, gps_measurement_noise[0], 2)
+                gps_measurement = x[:2, 0] + np.random.normal(0, np.sqrt(np.array(gps_measurement_noise)), 2)
                 ekf.update_gps(gps_measurement)
+                gps_measurement_history.append(gps_measurement.copy())
                 print(f"GPS measurement: {gps_measurement}")
                 next_gps_measurement_time = current_time + np.random.normal(gps_measurement_interval_distribution[0], gps_measurement_interval_distribution[1])
 
@@ -154,6 +159,8 @@ def run_ekf_experiment(total_waypoints: int = 20,
             ekf_arr = np.array(ekf_history)
             gt_trail.set_data(gt_arr[:, 0], gt_arr[:, 1])
             ekf_trail.set_data(ekf_arr[:, 0], ekf_arr[:, 1])
+            if len(gps_measurement_history) > 0:
+                gps_scatter.set_offsets(np.array(gps_measurement_history))
 
             # Update live variance plot
             Pdiag_arr = np.asarray(Pdiag_history)
@@ -170,10 +177,32 @@ def run_ekf_experiment(total_waypoints: int = 20,
             # Iterate the simulation
             r.step()
 
-    #Call at end of script to print debug information and for your script to run on the Robotarium server properly
-
-    np.savez('ekf_experiment_results.npz', gt_history=gt_history, ekf_history=ekf_history, Pdiag_history=Pdiag_history)
+    # Call at end of script to print debug information and for your script to run on the Robotarium server properly
+    np.savez('ekf_experiment_results.npz', gt_history=gt_history, ekf_history=ekf_history, Pdiag_history=Pdiag_history, gps_measurement_history=gps_measurement_history)
     r.call_at_scripts_end()
+
+    # Summary plots: save variance figure and trajectory + GPS figure
+    if len(gt_history) > 0:
+        plt.ioff()
+        var_fig.savefig('ekf_variances.png', dpi=150)
+        gt_arr = np.array(gt_history)
+        ekf_arr = np.array(ekf_history)
+        fig, ax = plt.subplots(1, 1, figsize=(6, 6))
+        ax.plot(gt_arr[:, 0], gt_arr[:, 1], 'b-', linewidth=1.5, label='Ground Truth')
+        ax.plot(ekf_arr[:, 0], ekf_arr[:, 1], 'r--', linewidth=1.5, label='EKF Estimate')
+        if len(gps_measurement_history) > 0:
+            gps_arr = np.array(gps_measurement_history)
+            ax.scatter(gps_arr[:, 0], gps_arr[:, 1], marker='x', s=80, c='green', linewidths=2, label='GPS', zorder=5)
+        ax.set_xlabel('x (m)', fontsize=8)
+        ax.set_ylabel('y (m)', fontsize=8)
+        ax.legend(fontsize=7)
+        ax.set_aspect('equal')
+        ax.grid(True, alpha=0.3)
+        ax.tick_params(axis='both', labelsize=7)
+        fig.suptitle('Trajectory and GPS measurements', fontsize=9)
+        fig.tight_layout()
+        fig.savefig('ekf_trajectory_gps.png', dpi=150)
+        plt.show(block=True)
 
 def validate_inputs(total_waypoints: int, process_noise: np.ndarray, spoof_gps_measurements: bool, gps_measurement_interval_distribution: float, gps_measurement_noise: np.ndarray, use_imu_measurements: bool, imu_measurement_noise: np.ndarray):
     """ Validate the inputs to the run_ekf_experiment function """
@@ -190,10 +219,10 @@ def parse_args():
     """ Parse the command line arguments """
     parser = argparse.ArgumentParser(description="Run EKF experimentation")
     parser.add_argument("--total_waypoints", type=int, default=10, help="Total waypoints")
-    parser.add_argument("--process_noise", type=float, nargs=3, default=[0.01, 0.01, 0.01], help="Process noise (x, y, theta) as a list of three floats representing the x, y, and theta process noise variances")
+    parser.add_argument("--process_noise", type=float, nargs=3, default=[0.0001, 0.0001, 0.0001], help="Process noise (x, y, theta) as a list of three floats representing the x, y, and theta process noise variances")
     parser.add_argument("--spoof_gps_measurements", action='store_true', default=False, help="Whether to spoof GPS measurements")
-    parser.add_argument("--gps_measurement_interval_distribution", type=float, nargs=2, default=[1.0, 1.0], help="GPS measurement interval distribution (mean, std) as a list")
-    parser.add_argument("--gps_measurement_noise", type=float, nargs=2, default=[0.01, 0.01], help="GPS measurement noise (x, y) as a list")
+    parser.add_argument("--gps_measurement_interval_distribution", type=float, nargs=2, default=[5.0, 2.5], help="GPS measurement interval distribution (mean, std) as a list")
+    parser.add_argument("--gps_measurement_noise", type=float, nargs=2, default=[0.0001, 0.0001], help="GPS measurement noise (x, y) as a list")
     parser.add_argument("--use_imu_measurements", type=bool, default=False, help="Whether to use IMU measurements")
     parser.add_argument("--imu_measurement_noise", type=float, nargs=3, default=[0.01, 0.01, 0.01], help="IMU measurement noise (acc_x, acc_y, yaw rate) as a list")
     return parser.parse_args()
