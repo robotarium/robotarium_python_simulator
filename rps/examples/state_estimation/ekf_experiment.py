@@ -133,7 +133,8 @@ def run_ekf_experiment(total_waypoints: int = 20,
             current_time = time.time()
             if current_time >= next_gps_measurement_time:
                 gps_measurement = x[:2, 0] + np.random.normal(0, np.sqrt(np.array(gps_measurement_noise)), 2)
-                ekf.update_gps(gps_measurement)
+                if spoof_gps_measurements:
+                    ekf.update_gps(gps_measurement)
                 gps_measurement_history.append(gps_measurement.copy())
                 print(f"GPS measurement: {gps_measurement}")
                 next_gps_measurement_time = current_time + np.random.normal(gps_measurement_interval_distribution[0], gps_measurement_interval_distribution[1])

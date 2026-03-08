@@ -5,11 +5,12 @@ from rps.utilities.misc import *
 from rps.utilities.controllers import *
 
 import numpy as np
-import time
+import os
+
 
 # Instantiate Robotarium object
 N = 4
-initial_conditions = np.array(np.mat('1 0.5 -0.5 0; 0.8 -0.3 -0.75 0.1; 0 0 0 0'))
+initial_conditions = np.array(np.asmatrix('1 0.5 -0.5 0; 0.8 -0.3 -0.75 0.1; 0 0 0 0'))
 
 r = robotarium.Robotarium(number_of_robots=N, show_figure=True, initial_conditions=initial_conditions, sim_in_real_time=False)
 
@@ -29,7 +30,8 @@ _, uni_to_si_states = create_si_to_uni_mapping()
 si_to_uni_dyn = create_si_to_uni_dynamics_with_backwards_motion()
 
 #Read in and scale image
-gt_img = plt.imread('GTLogo.png')
+script_dir = os.path.dirname(os.path.realpath(__file__))
+gt_img = plt.imread(os.path.join(script_dir, 'GTLogo.png'))
 x_img = np.linspace(-1.0, 1.0, gt_img.shape[1])
 y_img = np.linspace(-1.0, 1.0, gt_img.shape[0])
 

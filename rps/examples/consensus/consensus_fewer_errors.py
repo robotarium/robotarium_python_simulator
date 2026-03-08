@@ -46,9 +46,9 @@ for k in range(iterations):
 
     #Keep single integrator control vectors under specified magnitude
     # Threshold control inputs
-    norms = np.linalg.norm(dxi, 2, 0)
+    norms = np.linalg.norm(si_velocities, 2, 0)
     idxs_to_normalize = (norms > magnitude_limit)
-    dxi[:, idxs_to_normalize] *= magnitude_limit/norms[idxs_to_normalize]
+    si_velocities[:, idxs_to_normalize] *= magnitude_limit/norms[idxs_to_normalize]
 
     # Use the barrier certificate to avoid collisions
     si_velocities = si_barrier_cert(si_velocities, x_si)

@@ -9,7 +9,7 @@ import numpy as np
 # How many robots we want to use in the simulation
 N = 10
 # Instantiate the Robotarium object with these parameters
-r = robotarium.Robotarium(number_of_robots=N, show_figure=True, sim_in_real_time=True, skip_init=True, enable_safety=False, drive_forward=False)
+r = robotarium.Robotarium(number_of_robots=N, show_figure=True, sim_in_real_time=True)
 
 # How many times should the robots form the circle?
 num_cycles=2
