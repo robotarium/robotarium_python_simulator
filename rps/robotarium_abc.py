@@ -1,11 +1,11 @@
-import time
 import math
 from abc import ABC, abstractmethod
 
 import numpy as np
+from numpy.typing import NDArray
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from typing import List, Tuple
+from typing import List
 import rps.utilities.misc as misc
 
 # RobotariumABC: This is an interface for the Robotarium class that
@@ -14,17 +14,34 @@ import rps.utilities.misc as misc
 # THIS FILE SHOULD NEVER BE MODIFIED OR SUBMITTED!
 
 class RobotariumABC(ABC):
+    def __init__(
+        self,
+        number_of_robots: int = -1,
+        show_figure: bool = True,
+        sim_in_real_time: bool = True,
+        initial_conditions: NDArray[np.floating] = np.array([]),
+        use_distance_sensors: bool = False,
+        obstacles: NDArray[np.floating] = None
+    ):
+        """
+        Initialize the Robotarium object.
 
-    def __init__(self, number_of_robots=-1, show_figure=True, sim_in_real_time=True, initial_conditions=np.array([]), use_distance_sensors=False, obstacles=None):
-
+        Args:
+            number_of_robots: The number of robots to be used in the simulation. Must be between 0 and 50. If -1 is provided, the number of robots will be determined by the number of columns in the initial_conditions array.
+            show_figure: Whether to display the figure window showing the simulation. Setting this to False will speed up the simulation, but you will not be able to see the robot movements. Default is True.
+            sim_in_real_time: Whether to run the simulation in real time, with each loop taking approximately 0.033 seconds. Setting this to False will run the simulation as fast as possible, which may be useful for testing or if you   don't care about the timing of the simulation. Default is True.
+            initial_conditions: A 3xN numpy array of the initial conditions for each of the N robots, where the first row is the x position, the second row is the y position, and the third row is the orientation (in radians). If an empty array is provided, the initial conditions will be automatically generated with a spacing of 0.2 meters between robots.
+            use_distance_sensors: Whether to enable distance sensors on the robots. If True, the get_distances() function will return simulated distance sensor readings for each robot. Default is False.
+            obstacles: An Mx2x2 numpy array of M obstacles defined by their start (left column) and end points (right column). For example, an obstacle that spans from (0,0) to (1,1) would be represented as [[[0, 0], [1, 1]]]. 
+        """
         #Check user input types
-        assert isinstance(number_of_robots,int), "The number of robots used argument (number_of_robots) provided to create the Robotarium object must be an integer type. Recieved type %r." % type(number_of_robots).__name__
-        assert isinstance(initial_conditions,np.ndarray), "The initial conditions array argument (initial_conditions) provided to create the Robotarium object must be a numpy ndarray. Recieved type %r." % type(initial_conditions).__name__
-        assert isinstance(show_figure,bool), "The display figure window argument (show_figure) provided to create the Robotarium object must be boolean type. Recieved type %r." % type(show_figure).__name__
-        assert isinstance(sim_in_real_time,bool), "The simulation running at 0.033s per loop (sim_real_time) provided to create the Robotarium object must be boolean type. Recieved type %r." % type(show_figure).__name__
-        assert isinstance(use_distance_sensors,bool), "The use_distance_sensors argument provided to create the Robotarium object must be boolean type. Recieved type %r." % type(use_distance_sensors).__name__
+        assert isinstance(number_of_robots, int), "The number of robots used argument (number_of_robots) provided to create the Robotarium object must be an integer type. Recieved type %r." % type(number_of_robots).__name__
+        assert isinstance(initial_conditions, np.ndarray), "The initial conditions array argument (initial_conditions) provided to create the Robotarium object must be a numpy ndarray. Recieved type %r." % type(initial_conditions).__name__
+        assert isinstance(show_figure, bool), "The display figure window argument (show_figure) provided to create the Robotarium object must be boolean type. Recieved type %r." % type(show_figure).__name__
+        assert isinstance(sim_in_real_time, bool), "The simulation running at 0.033s per loop (sim_real_time) provided to create the Robotarium object must be boolean type. Recieved type %r." % type(sim_in_real_time).__name__
+        assert isinstance(use_distance_sensors, bool), "The use_distance_sensors argument provided to create the Robotarium object must be boolean type. Recieved type %r." % type(use_distance_sensors).__name__
         if obstacles is not None:
-            assert isinstance(obstacles,np.ndarray), "The obstacles array argument (obstacles) provided to create the Robotarium object must be a numpy ndarray. Recieved type %r." % type(obstacles).__name__
+            assert isinstance(obstacles, np.ndarray), "The obstacles array argument (obstacles) provided to create the Robotarium object must be a numpy ndarray. Recieved type %r." % type(obstacles).__name__
         
         #Check user input ranges/sizes
         assert (number_of_robots >= 0 and number_of_robots <= 50), "Requested %r robots to be used when creating the Robotarium object. The deployed number of robots must be between 0 and 50." % number_of_robots 
@@ -74,7 +91,7 @@ class RobotariumABC(ABC):
         self.distance_sensor_dropout_prob = 0.035; # 3.5 percent of readings dropped     (TECHNICALLY ZERO AFTER MASKING THE FIRST BATCH OF READINGS?)
         self.distance_sensor_outlier_prob = .014;   # 1.4 percent phantom readings
 
-        self.imu_orientation = [[0.0594 - 0.00319], [0.0344628 - 0.0475], [0.0]] # x, y positions, and heading of IMU in robot frame (meters). Origin is assumed to be the center of the axle.
+        self.imu_orientation = np.array([[0.0594 - 0.00319], [0.0344628 - 0.0475], [0.0]]) # x, y positions, and heading of IMU in robot frame (meters). Origin is assumed to be the center of the axle.
 
         self.obstacles = obstacles # M x 2 x 2 array of M obstacles defined by their start (left column) and end points (right column)
 
@@ -83,11 +100,19 @@ class RobotariumABC(ABC):
         self.poses = self.initial_conditions
         if self.initial_conditions.size == 0:
             self.poses = misc.generate_initial_conditions(self.number_of_robots, spacing=0.2, width=2.5, height=1.5)
+
+        # Sensor Noise Standard Deviations (Averaged across 12 robots for 5 minutes of runtime)
+        self.gyro_noise_stds = np.array([0.001663, 0.001216, 0.002372])
+        self.magnetometer_noise_stds = np.array([3.275843, 2.365798, 5.232685])
+        self.magnetometer_z_avg = -39.8594
+        self.magnetometer_xy_avg = 6.0712
+        self.accelerometer_noise_stds = np.array([0.012929, 0.012127, 0.052979])
+        self.orientation_noise_std = 0.310830
         
         # Sensor Measurements
         self.distances = -1*np.ones((7, number_of_robots)) # Real robots return -1 if distance sensors are not enabled
         self.accelerations = np.zeros((3, number_of_robots))
-        self.orientations = np.zeros((3, number_of_robots))
+        self.orientations = np.zeros(number_of_robots)
         self.magnetic_fields = np.zeros((3, number_of_robots))
         self.gyros = np.zeros((3, number_of_robots))
         self.initial_encoders = np.zeros((2, number_of_robots))
@@ -169,7 +194,16 @@ class RobotariumABC(ABC):
 
             plt.subplots_adjust(left=-0.03, right=1.03, bottom=-0.03, top=1.03, wspace=0, hspace=0)
 
-    def set_velocities(self, ids, velocities):
+    def set_velocities(self, ids: NDArray[np.integer], velocities: NDArray[np.floating]):
+        """
+        Set the velocities for the specified robots.
+
+        Args:
+            ids: A list of robot ids for which to set velocities.
+            velocities: A 2xN numpy array of the desired velocities for each robot, where the first row is the linear velocity and the second row is the angular velocity.
+        """
+        assert len(ids) == velocities.shape[1], "The number of robot ids provided to set_velocities must match the number of velocity columns provided. Received %r ids and %r velocity columns." % (len(ids), velocities.shape[1])
+        ids = np.asarray(ids)
 
         # Threshold linear velocities
         idxs = np.where(np.abs(velocities[0, :]) > self.max_linear_velocity)
@@ -178,38 +212,76 @@ class RobotariumABC(ABC):
         # Threshold angular velocities
         idxs = np.where(np.abs(velocities[1, :]) > self.max_angular_velocity)
         velocities[1, idxs] = self.max_angular_velocity*np.sign(velocities[1, idxs])
-        self.velocities = velocities
+        self.velocities[:, ids] = velocities
 
-    def set_leds(self, ids, leds):
-        """Set the led value for each robot in ids"""
-        return
+    def set_leds(self, ids: NDArray[np.integer], leds: NDArray[np.floating]):
+        """
+        Set the led value for each robot in ids
 
-    def get_distances(self):
-        """Get the distance sensor readings for each robot"""
-        return self.distances
+        Args:
+            ids: A list of robot ids for which to set leds.
+            leds: A 3xN numpy array of the desired led values for each robot, where the first row is the red component, the second row is the green component, and the third row is the blue component.
+        """
+        assert len(ids) == leds.shape[1], "The number of robot ids provided to set_leds must match the number of led columns provided. Received %r ids and %r led columns." % (len(ids), leds.shape[1])
+        assert leds.shape[0] == 3, "The number of rows in the leds array provided to set_leds must be 3. Received %r rows." % (leds.shape[0])
+        self.leds[ids] = leds
+
+    def get_distances(self) -> NDArray[np.floating]:
+        """
+        Get the distance sensor readings for each robot
+
+        Returns:
+            A 7xN numpy array of the distance sensor readings for each of the N robots
+        """
+        return self.distances.copy()
     
     def transform_distance_readings(self):
         """Get the transformed end points in global Robotarium coordinates from distance sensor readings"""
         return self.distance_end_points
     
-    def get_accelerations(self):
-        """Get the accelerometer readings for each robot"""
-        return self.accelerations
+    def get_accelerations(self) -> NDArray[np.floating]:
+        """
+        Get the accelerometer readings for each robot.
+
+        Returns:
+            A 3xN numpy array of the accelerometer readings for each of the N robots, where the first row is the x-acceleration, the second row is the y-acceleration, and the third row is the angular acceleration.
+        """
+        return self.accelerations.copy()
     
-    def get_orientations(self):
-        """Get the orientation readings for each robot"""
-        return self.orientations
+    def get_orientations(self) -> NDArray[np.floating]:
+        """
+        Get the orientation readings for each robot.
+
+        Returns:
+            A 1xN numpy array of the orientation readings for each of the N robots.
+        """
+        return self.orientations.copy()
     
-    def get_magnetic_fields(self):
-        """Get the magnetic field readings for each of the robots"""
-        return self.magnetic_fields
+    def get_magnetic_fields(self) -> NDArray[np.floating]:
+        """
+        Get the magnetic field readings for each of the robots.
+
+        Returns:
+            A 3xN numpy array of the magnetic field readings for each of the N robots, where the first row is the x-component, the second row is the y-component, and the third row is the z-component.
+        """
+        return self.magnetic_fields.copy()
     
-    def get_gyros(self):
-        """Get the gyro readings for each of the robots"""
-        return self.gyros
+    def get_gyros(self) -> NDArray[np.floating]:
+        """
+        Get the gyro readings for each of the robots.
+
+        Returns:
+            A 3xN numpy array of the gyro readings for each of the N robots, where the first row is the x-angular velocity, the second row is the y-angular velocity, and the third row is the z-angular velocity.
+        """
+        return self.gyros.copy()
     
-    def get_encoders(self):
-        """Get the encoder readings for each of the robots"""
+    def get_encoders(self) -> NDArray[np.integer]:
+        """
+        Get the encoder readings for each of the robots.
+
+        Returns:
+            A 1xN numpy array of the encoder readings for each of the N robots.
+        """
         return np.int32(self.encoders) - np.int32(self.initial_encoders)
 
     @abstractmethod

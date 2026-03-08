@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.typing import NDArray
 import matplotlib.pyplot as plt
 
 
@@ -153,3 +154,59 @@ def determine_font_size(robotarium_instance, font_height_meters):
 
 	# Determine the font size in points so it fits the window.
 	return (font_ratio*font_height_meters)
+
+
+def calculate_global_distance_points(
+    robotarium_instance,
+    poses: NDArray[np.floating],
+    distances: NDArray[np.floating],
+) -> NDArray[np.floating]:
+    """Calculates the global coordinates of points detected by distance sensors.
+
+    Args:
+        poses: A 3xN array of robot poses (x, y, theta).
+        distances: A 7xN array of distance sensor readings for each robot.
+    Returns:
+        A 3x7xN array of global coordinates of detected points for each robot.
+    """
+    N = poses.shape[1]
+    N_sensors = distances.shape[0]
+    distance_sensors_orientation = robotarium_instance.distance_sensors_orientation  # (3, 7)
+
+    # Mask invalid readings (-1 means no detection)
+    valid_distances = distances.astype(float).copy()
+    valid_distances[valid_distances < 0] = np.nan
+
+    # Get rotation matrices for each robot: (N, 3, 3)
+    R = rotation_matrix(poses[2, :])
+
+    # Global sensor positions and orientations: (N, 3, 7)
+    poses_col = poses.T[:, :, None]  # (N, 3, 1)
+    global_sensors = poses_col + np.matmul(R, distance_sensors_orientation)  # (N, 3, 7)
+
+    # Get rotation matrices for each sensor orientation: (N, 3, 3) per sensor
+    # global_sensors[:, 2, :] has shape (N, 7) - the orientation of each sensor
+    R_sensor = rotation_matrix(global_sensors[:, 2, :])  # (N*7, 3, 3)
+
+    # Unit ray direction for each sensor (pointing along x-axis in sensor frame)
+    unit_ray = np.array([1.0, 0.0, 0.0]).reshape(3, 1)  # (3, 1)
+    unit_rays = np.tile(unit_ray, (N * N_sensors, 1, 1))  # (N*7, 3, 1)
+
+    # Rotate unit rays into global frame: (N*7, 3, 1) -> (N, 7, 2)
+    ray_directions = np.matmul(R_sensor, unit_rays).squeeze(-1)  # (N*7, 3)
+    ray_directions = ray_directions.reshape(N, N_sensors, 3)[:, :, :2]  # (N, 7, 2)
+
+    # Scale ray directions by distance readings
+    # valid_distances: (7, N) -> (N, 7)
+    d = valid_distances.T[:, :, None]  # (N, 7, 1)
+    
+    # Global sensor origins: (N, 3, 7) -> (N, 7, 2)
+    sensor_origins = global_sensors[:, :2, :].transpose(0, 2, 1)  # (N, 7, 2)
+
+    # Global sensor endpoints: (N, 7, 2)
+    global_points = sensor_origins + d * ray_directions  # (N, 7, 2)
+
+    # Transpose to (2, 7, N)
+    global_points = global_points.transpose(2, 1, 0)  # (2, 7, N)
+
+    return global_points

@@ -5,7 +5,6 @@ from rps.utilities.misc import *
 from rps.utilities.controllers import *
 
 import numpy as np
-import time
 
 # Instantiate Robotarium object
 N = 1
@@ -65,7 +64,7 @@ data['poses'] = np.zeros((N, 3, 1))
 data['distances'] = np.zeros((N, 7, 1))
 data['accelerations'] = np.zeros((N, 3, 1))
 data['magnetic_fields'] = np.zeros((N, 3, 1))
-data['orientations'] = np.zeros((N, 3, 1))
+data['orientations'] = np.zeros((N, 1, 1))
 data['encoders'] = np.zeros((N, 2, 1))
 
 # Main loop to navigate to each goal and record sensor data
@@ -91,30 +90,29 @@ while index < x_goals.size:
         #           [ math.pi, math.pi/2, math.pi/4, 0.0,  -math.pi/4, -math.pi/2, -math.pi]])
         distances = r.get_distances()
 
-        # r.get_accelerations() returns accelerations in shape (3, N_robots) in IMU frame.
-        # r.get_magnetic_fields() returns magnetic field readings in shape (3, N_robots) in IMU frame.
-        # The magnetic field reading is simulated based on recorded data over the Robotarium arena, and 
-        # the numbers are in microteslas (uT).
-        # r.get_orientations() returns fused orientation (yaw, roll, pitch) in shape (3, N_robots) in IMU frame.
-        # The orientations are relative, and they depend on the orientation of the charging station of the robot.
-        # A robot's 0 degree is either 90 degrees or 180 degrees relative to the global frame. 
-        # The position of the IMU is [[0.0594 - 0.00319], [0.0344628 - 0.0475], [0.0]] in robot frame.
-        #       Accelerometer axes (in robot frame):
-        #       X-axis: Left
-        #       Y-axis: Backward
-        #       Z-axis: Down
+        # r.get_accelerations() returns accelerations in shape (3, N_robots) in Robot frame.
+        # r.get_magnetic_fields() returns magnetic field readings in shape (3, N_robots) in Robot frame.
+        # The magnetic field reading is simulated based on the testbed x-axis being aligned with magnetic north, and the y-axis being aligned with magnetic east.
+        # r.get_orientations() returns fused orientation (yaw) in shape (1, N_robots) in IMU frame.
+        # The orientations are global to the robotarium where 0 degrees is aligned with the positive x-axis of the robotarium, and positive rotation is counterclockwise.
         #
-        #       Magnetometer axes (in robot frame):
-        #       X-axis: Right
-        #       Y-axis: Forward
+        # All IMU measurements are simulated with additive Gaussian noise according to measured standard deviations
+        # from the physical IMU sensors on the Robotarium testbed, and the axes are defined as follows:
+        # 
+        #   Accelerometer axes (in robot frame):
+        #       X-axis: Forward
+        #       Y-axis: Left
         #       Z-axis: Up
         #
-        #       Fused Orientation axes (in robot frame):
-        #       Roll: Yaw
-        #       Pitch: Roll
-        #       Yaw: Pitch
+        #   Gyrometer axes (in robot frame):
+        #       X-axis: Roll
+        #       Y-axis: Pitch
+        #       Z-axis: Yaw
         #
-        #       The IMU simulation is now noise-free for easier debugging.
+        #   Magnetometer axes (in global frame):
+        #       X-axis: X-axis of the robotarium, aligned with magnetic north
+        #       Y-axis: Y-axis of the robotarium, aligned with magnetic east
+        #       Z-axis: Perpendicular to the plane of the robotarium, pointing up
         accelerations = r.get_accelerations()
         magnetic_fields = r.get_magnetic_fields()
         orientations = r.get_orientations()
@@ -131,7 +129,7 @@ while index < x_goals.size:
         data['distances'] = np.dstack((data['distances'], distances.T.reshape(N, 7, 1)))
         data['accelerations'] = np.dstack((data['accelerations'], accelerations.T.reshape(N, 3, 1)))
         data['magnetic_fields'] = np.dstack((data['magnetic_fields'],magnetic_fields.T.reshape(N, 3, 1)))
-        data['orientations'] = np.dstack((data['orientations'], orientations.T.reshape(N, 3, 1)))
+        data['orientations'] = np.dstack((data['orientations'], orientations.T.reshape(N, 1, 1)))
         data['encoders'] = np.dstack((data['encoders'], encoders.T.reshape(N, 2, 1)))
 
         # Increment goal index

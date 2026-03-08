@@ -13,6 +13,7 @@ DESCRIPTION = 'A Python-based simulator for the Robotarium.'
 URL = 'https://github.com/robotarium/robotarium_python_simulator'
 EMAIL = 'Sean.T.Wilson@gatech.edu'
 AUTHOR = 'Sean Wilson and Paul Glotfelter'
+VERSION = "2.0.0"
 
 # What packages are required for this module to be executed?
 REQUIRED = [
@@ -72,7 +73,7 @@ class UploadCommand(Command):
 # Where the magic happens:
 setup(
     name=NAME,
-    #version=about['__version__'],
+    version=VERSION,
     description=DESCRIPTION,
     long_description=long_description,
     author=AUTHOR,
