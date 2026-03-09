@@ -72,23 +72,25 @@ class Robotarium(RobotariumABC):
 
         return self.poses.copy()
 
-    def call_at_scripts_end(self):
-        """Call this function at the end of scripts to display potentail errors.  
-        Even if you don't want to print the errors, calling this function at the
-        end of your script will enable execution on the Robotarium testbed.
-        """
-        print('##### DEBUG OUTPUT #####')
-        print('Your simulation will take approximately {0} real seconds when deployed on the Robotarium. \n'.format(math.ceil(self._iterations*0.033)))
-
-        if bool(self._errors):
-            if "boundary" in self._errors:
-                print('\t Simulation had {0} {1}\n'.format(self._errors["boundary"], self._errors["boundary_string"]))
-            if "collision" in self._errors:
-                print('\t Simulation had {0} {1}\n'.format(self._errors["collision"], self._errors["collision_string"]))
-            if "actuator" in self._errors:
-                print('\t Simulation had {0} {1}'.format(self._errors["actuator"], self._errors["actuator_string"]))
-        else:
-            print('No errors in your simulation! Acceptance of your experiment is likely!')
+        def call_at_scripts_end(self):
+            """Call this function at the end of scripts to display potentail errors.  
+            Even if you don't want to print the errors, calling this function at the
+            end of your script will enable execution on the Robotarium testbed.
+            """
+            print('##### DEBUG OUTPUT #####')
+            print('Your simulation will take approximately {0} real seconds when deployed on the Robotarium. \n'.format(math.ceil(self._iterations*self.time_step)))
+            # TODO: check collision string and boundary string
+            if bool(self._errors):
+                if "boundary" in self._errors:
+                    boundary_violations = max(self._errors["boundary"].values())
+                    print('\t Simulation had {0} {1}\n'.format(boundary_violations, self._errors["boundary_string"]))
+                if "collision" in self._errors:
+                    collision_violations = max(self._errors["collision"].values())
+                    print('\t Simulation had {0} {1}\n'.format(collision_violations, self._errors["collision_string"]))
+                if "actuator" in self._errors:
+                    print('\t Simulation had {0} {1}'.format(self._errors["actuator"], self._errors["actuator_string"]))
+            else:
+                print('No errors in your simulation! Acceptance of your experiment is likely!')
 
         return
 
@@ -105,6 +107,8 @@ class Robotarium(RobotariumABC):
         self._errors = self._validate()
         self._iterations += 1
 
+        #Perform Thresholding of Motors
+        self.velocities = self._threshold(self.velocities)
 
         # Update dynamics of agents
         self.poses[0, :] = self.poses[0, :] + self.time_step*np.cos(self.poses[2,:])*self.velocities[0, :]
@@ -128,12 +132,6 @@ class Robotarium(RobotariumABC):
 
         # Update graphics
         if(self.show_figure):
-            if(self.sim_in_real_time):
-                t = time.time()
-                while(t - self.previous_render_time < self.time_step):
-                    t=time.time()
-                self.previous_render_time = t
-
             for i in range(self.number_of_robots):
                 # self.chassis_patches[i].xy = self.poses[:2, i] + self.robot_radius*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i])))
                 # if i == 0:
@@ -146,25 +144,39 @@ class Robotarium(RobotariumABC):
                 # self.chassis_patches[i].orientation = self.poses[2, i] + math.pi/4
                 self.chassis_patches[i].angle = (self.poses[2, i] - math.pi/2) * 180/math.pi
 
+                self.chassis_patches[i].zorder = 2
+
                 self.right_wheel_patches[i].center = self.poses[:2, i]+self.robot_length/2*np.array((np.cos(self.poses[2, i]+math.pi/2), np.sin(self.poses[2, i]+math.pi/2)))+\
                                         0.04*np.array((-np.sin(self.poses[2, i]+math.pi/2), np.cos(self.poses[2, i]+math.pi/2)))  + self.robot_length/2*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i])))
                 self.right_wheel_patches[i].orientation = self.poses[2, i] + math.pi/4
 
+                self.right_wheel_patches[i].zorder = 2
+
                 self.left_wheel_patches[i].center = self.poses[:2, i]+self.robot_length/2*np.array((np.cos(self.poses[2, i]-math.pi/2), np.sin(self.poses[2, i]-math.pi/2)))+\
                                         0.04*np.array((-np.sin(self.poses[2, i]+math.pi/2), np.cos(self.poses[2, i]+math.pi/2))) + self.robot_length/2*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i])))
                 self.left_wheel_patches[i].orientation = self.poses[2,i] + math.pi/4
-                
-                self.led_patches[i].center = self.poses[:2, i]+0.75*self.robot_length/2*np.array((np.cos(self.poses[2,i]), np.sin(self.poses[2,i])))-\
-                                0.015*np.array((-np.sin(self.poses[2, i]), np.cos(self.poses[2, i]))) + self.robot_length/2*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i])))
-                # self.base_patches[i].center = self.poses[:2, i]
 
-            # Update distance sensor rays
-            if self.distance_sensors_enabled:
-                self.distance_ray_patch.set_offsets(self.distance_end_points.T)
+                self.left_wheel_patches[i].zorder = 2
                 
+                self.right_led_patches[i].center = self.poses[:2, i]+0.75*self.robot_length/2*np.array((np.cos(self.poses[2,i]), np.sin(self.poses[2,i])))-\
+                                0.04*np.array((-np.sin(self.poses[2, i]), np.cos(self.poses[2, i]))) + self.robot_length/2*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i])))
+                self.left_led_patches[i].center = self.poses[:2, i]+0.75*self.robot_length/2*np.array((np.cos(self.poses[2,i]), np.sin(self.poses[2,i])))-\
+                                0.015*np.array((-np.sin(self.poses[2, i]), np.cos(self.poses[2, i]))) + self.robot_length/2*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i])))
+                self.left_led_patches[i].zorder = 2
+                self.right_led_patches[i].zorder = 2
+
+                # Update distance sensor rays
+                if self.distance_sensors_enabled:
+                    self.distance_ray_patch.set_offsets(self.distance_end_points.T)
 
             self.figure.canvas.draw_idle()
             self.figure.canvas.flush_events()
+
+        if(self.sim_in_real_time):
+                t = time.time()
+                while(t - self.previous_render_time < self.time_step):
+                    t=time.time()
+                self.previous_render_time = t
 
     def _simulate_encoder_readings(self):
         # Simulate encoder readings based on wheel velocities

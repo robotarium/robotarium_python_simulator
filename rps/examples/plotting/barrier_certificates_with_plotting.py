@@ -22,7 +22,7 @@ safety_radius = 0.17
 # Plotting Parameters
 CM = np.random.rand(N,3) # Random Colors
 safety_radius_marker_size = determine_marker_size(r,safety_radius) # Will scale the plotted markers to be the diameter of provided argument (in meters)
-font_height_meters = 0.1
+font_height_meters = 0.2
 font_height_points = determine_font_size(r,font_height_meters) # Will scale the plotted font height to that of the provided argument (in meters)
 
 # Initial plots

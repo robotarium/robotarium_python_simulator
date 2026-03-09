@@ -193,6 +193,9 @@ class RobotariumABC(ABC):
             plt.show()
 
             plt.subplots_adjust(left=-0.03, right=1.03, bottom=-0.03, top=1.03, wspace=0, hspace=0)
+        else:
+            self.figure.set_visible(False)
+            plt.draw()
 
     def set_velocities(self, ids: NDArray[np.integer], velocities: NDArray[np.floating]):
         """
@@ -300,6 +303,7 @@ class RobotariumABC(ABC):
         dxdd[to_thresh] = self.max_wheel_velocity*np.sign(dxdd[to_thresh])
 
         dxu = self._diff_to_uni(dxdd)
+        return dxu
 
     def _uni_to_diff(self, dxu):
         r = self.wheel_radius
@@ -329,9 +333,13 @@ class RobotariumABC(ABC):
 
             if(x < b[0] or x > (b[0] + b[2]) or y < b[1] or y > (b[1] + b[3])):
                     if "boundary" in errors:
-                        errors["boundary"] += 1
+                        if i in errors["boundary"]:
+                            errors["boundary"][i] += 1
+                        else:
+                            errors["boundary"][i] = 1
+                            
                     else:
-                        errors["boundary"] = 1
+                        errors["boundary"] = {i: 1}
                         errors["boundary_string"] = "iteration(s) robots were outside the boundaries."
 
         for j in range(N-1):
@@ -341,9 +349,20 @@ class RobotariumABC(ABC):
                 if(np.linalg.norm(first_position - second_position) <= (self.collision_diameter)):
                 # if (np.linalg.norm(p[:2,j]-p[:2,k]) <= self.robot_diameter):
                     if "collision" in errors:
-                        errors["collision"] += 1
+                        if j in errors["collision"]:
+                            errors["collision"][j] += 1
+                        else:
+                            errors["collision"][j] = 1
+                        # if k == N:
+                        if k in errors["collision"]:
+                            errors["collision"][k] += 1
+                        else:
+                            errors["collision"][k] = 1
                     else:
-                        errors["collision"] = 1
+                        errors["collision"]= {j: 1}
+                        errors["collision"][k] = 1
+                        # if k == N:
+
                         errors["collision_string"] = "iteration(s) where robots collided."
 
         dxdd = self._uni_to_diff(self.velocities)
@@ -353,7 +372,7 @@ class RobotariumABC(ABC):
                 errors["actuator"] += 1
             else:
                 errors["actuator"] = 1
-                errors["actuator_string"] = "iteration(s) where the actuator limits were exceeded."
+                errors["actuator_string"] = "iteration(s) where the actuator limits of at least one robot were exceeded and thresholded to their maximum rotational velocity."
 
         return errors
 
