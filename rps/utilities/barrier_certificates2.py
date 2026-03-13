@@ -9,18 +9,18 @@ solvers.options['maxiters'] = 50 # default is 100
 
 def create_robust_barriers(max_num_obstacles = 100, max_num_robots = 30, d = 5, wheel_vel_limit = 12.5, base_length = 0.105, wheel_radius = 0.016,
     projection_distance =0.05, gamma = 150, safety_radius = 0.12): # gamma was 150
-    D = np.matrix([[wheel_radius/2, wheel_radius/2], [-wheel_radius/base_length, wheel_radius/base_length]])
-    L = np.matrix([[1,0],[0,projection_distance]])* D
-    disturb = np.matrix([[-d, -d, d, d],[-d, d, d, -d]])
+    D = np.asmatrixrix([[wheel_radius/2, wheel_radius/2], [-wheel_radius/base_length, wheel_radius/base_length]])
+    L = np.asmatrixrix([[1,0],[0,projection_distance]])* D
+    disturb = np.asmatrixrix([[-d, -d, d, d],[-d, d, d, -d]])
     num_disturbs = np.size(disturb[1,:])
 
     #TODO: Take out 4*max_num_robots?
     max_num_constraints = (max_num_robots**2-max_num_robots)//2 + max_num_robots*max_num_obstacles + 4*max_num_robots
-    A = np.matrix(np.zeros([max_num_constraints, 2*max_num_robots]))
-    b = np.matrix(np.zeros([max_num_constraints, 1]))
-    Os = np.matrix(np.zeros([2,max_num_robots]))
-    ps = np.matrix(np.zeros([2,max_num_robots]))
-    Ms = np.matrix(np.zeros([2,2*max_num_robots]))
+    A = np.asmatrixrix(np.zeros([max_num_constraints, 2*max_num_robots]))
+    b = np.asmatrixrix(np.zeros([max_num_constraints, 1]))
+    Os = np.asmatrixrix(np.zeros([2,max_num_robots]))
+    ps = np.asmatrixrix(np.zeros([2,max_num_robots]))
+    Ms = np.asmatrixrix(np.zeros([2,2*max_num_robots]))
 
     def robust_barriers(dxu, x, obstacles):
 
@@ -68,7 +68,7 @@ def create_robust_barriers(max_num_obstacles = 100, max_num_robots = 30, d = 5, 
             diffs = ps[:,i] - ps[:, i+1:num_robots]
             hs = np.sum(np.square(diffs),0) - safety_radius**2 # 1 by N
             h_dot_is = 2*diffs.T*MDs[:,2*i:2*i+2] # N by 2
-            h_dot_js = np.matrix(np.zeros((2,num_robots - (i+1))))
+            h_dot_js = np.asmatrixrix(np.zeros((2,num_robots - (i+1))))
             h_dot_js[0, :] = -np.sum(2*np.multiply(diffs, MDs[:,2*(i+1):2*num_robots:2]), 0)
             h_dot_js[1, :] = -np.sum(2*np.multiply(diffs, MDs[:,2*(i+1)+1:2*num_robots:2]), 0)
             new_constraints = num_robots - i - 1
@@ -100,7 +100,7 @@ def create_robust_barriers(max_num_obstacles = 100, max_num_robots = 30, d = 5, 
         # Solve QP program generated earlier
         L_all = np.kron(np.eye(num_robots), L)
         dxu = np.linalg.inv(D)*dxu # Convert user input to differential drive
-        vhat = np.matrix(np.reshape(dxu ,(2*num_robots,1), order='F'))
+        vhat = np.asmatrixrix(np.reshape(dxu ,(2*num_robots,1), order='F'))
         H = 2*L_all.T*L_all
         f = np.transpose(-2*np.transpose(vhat)*np.transpose(L_all)*L_all)
 
