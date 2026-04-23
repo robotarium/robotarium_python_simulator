@@ -1,413 +1,358 @@
-import math
 import time
-    
 import numpy as np
 from numpy.typing import NDArray
-from matplotlib.lines import Line2D
-from rps.robotarium_abc import RobotariumABC
-from rps.utilities.misc import rotation_matrix
 
-# Robotarium This object provides routines to interface with the Robotarium.
-#
-# THIS CLASS SHOULD NEVER BE MODIFIED OR SUBMITTED
+from rps.robotarium_abc import ARobotarium
+from rps.utilities.misc import generate_random_poses, generate_initial_poses, create_at_pose, determine_font_size
+from rps.utilities.barrier_certificates import create_uni_barrier_certificate
+from rps.utilities.controllers import create_pose_controller_hybrid
+from rps.utilities.sensors import simulate_distance_sensors
 
-class Robotarium(RobotariumABC):
-    def __init__(
-        self,
-        number_of_robots: int = -1,
-        show_figure: bool = True,
-        sim_in_real_time: bool = True,
-        initial_conditions: NDArray[np.floating] = np.array([]),
-        use_distance_sensors: bool = False,
-        obstacles: NDArray[np.floating] = np.full((1,2,2), np.nan)
-    ):
-        """
-        Instantiate the Robotarium Simulator
+class Robotarium(ARobotarium):
+    """
+    Robotarium simulator.
 
-        Args:
-            number_of_robots (int): The number of robots in the simulation. Must be a positive integer.
-            show_figure (bool): Whether to display the simulation figure window. Set to False to disable graphics and speed up the simulation.
-            sim_in_real_time (bool): Whether to run the simulation in real time, with each loop taking approximately 0.033 seconds. Set to False to run as fast as possible, which may be useful for debugging but will not reflect real-world timing.
-            initial_conditions (np.ndarray): A 3xN numpy array specifying the initial poses of the N robots. Each column should be [x; y; theta] for a robot. If left empty, robots will be initialized at random positions and orientations.
-            use_distance_sensors (bool): Whether to simulate distance sensor readings for the robots. Enabling this will add realistic sensor noise and effects, but may slow down the simulation.
-            obstacles (np.ndarray): An Mx2x2 numpy array specifying M obstacles in the environment. Each obstacle is defined by two endpoints [[x1, x2], [y1, y2]]. If left empty, no obstacles will be present. 
-        """
-        super().__init__(number_of_robots, show_figure, sim_in_real_time, initial_conditions, use_distance_sensors, obstacles)
+    Parameters
+    ----------
+    number_of_robots : int
+        Positive integer number of robots (1 - 50).
+    show_figure : bool, optional
+        Render a graphical visualisation (default ``True``).
+    initial_conditions : np.ndarray, optional
+        3 x N array of initial ``[x; y; theta]`` poses.  If omitted or
+        empty, collision-free initial poses are generated automatically.
+    use_distance_sensors : bool, optional
+        Enable simulation of 7 range sensors per robot (default ``False``).
+    obstacles : np.ndarray or None, optional
+        M x 2 x 2 array of line-segment obstacles, each defined by start
+        (``[:, 0]``) and end (``[:, 1]``) endpoints in world coordinates.
+    sim_in_real_time : bool, optional
+        Throttle each step call to approximately TIME_STEP seconds 
+        of wall-clock time (default ``True``).
+    skip_initialization: bool, optional
+        If True, the simulator will skip the initialization phase where
+        robots drive onto the testbed and directly set the initial conditions.
+        This will be set to False by default and the verifier will always
+        use the initialization phase, but setting this to True may be useful
+        when debugging one's algorithm (default ``False``)
+    show_arena_boundaries: bool, optional
+        Whether to render the arena boundaries (default ``True``)
+    show_robot_patches: bool, optional
+        Whether to render the robot patches (default ``True``)
+    show_distance_endpoints: bool, optional
+        Whether to render the distance sensor endpoints (default ``True``)
+    show_distance_rays: bool, optional
+        Whether to render the distance sensor rays (default ``False``)
+    show_obstacles: bool, optional
+        Whether to render the obstacles (default ``True``)
+    """
 
-        #Initialize some rendering variables
-        self.previous_render_time = time.time()
-        self.sim_in_real_time = sim_in_real_time
-
-        #Initialize checks for step and get poses calls
-        self._called_step_already = True
-        self._checked_poses_already = False
-
-        #Initialization of error collection.
-        self._errors = {}
-
-        #Initialize steps
-        self._iterations = 0
-
-        # Draw obstacles if any
-        if(self.show_figure):
-            if self.obstacles is not None:
-                num_obstacles = self.obstacles.shape[0]
-                for i in range(num_obstacles):
-                    obstacle_patch = Line2D([self.obstacles[i,0,0], self.obstacles[i,0,1]], 
-                                            [self.obstacles[i,1,0], self.obstacles[i,1,1]], 
-                                            linewidth=4, color='0.5')
-                    self.axes.add_line(obstacle_patch)
-
-
-    def get_poses(self) -> NDArray[np.floating]:
-        """Returns the states of the agents.
-
-        -> 3xN numpy array (of robot poses)
-        """
-
-        assert(not self._checked_poses_already), "Can only call get_poses() once per call of step()."
-        # Allow step() to be called again.
-        self._called_step_already = False
-        self._checked_poses_already = True 
-
-        return self.poses.copy()
-
-    def call_at_scripts_end(self):
-        """Call this function at the end of scripts to display potentail errors.  
-        Even if you don't want to print the errors, calling this function at the
-        end of your script will enable execution on the Robotarium testbed.
-        """
-        print('##### DEBUG OUTPUT #####')
-        print('Your simulation will take approximately {0} real seconds when deployed on the Robotarium. \n'.format(math.ceil(self._iterations*self.time_step)))
-        # TODO: check collision string and boundary string
-        if bool(self._errors):
-            if "boundary" in self._errors:
-                boundary_violations = max(self._errors["boundary"].values())
-                print('\t Simulation had {0} {1}\n'.format(boundary_violations, self._errors["boundary_string"]))
-            if "collision" in self._errors:
-                collision_violations = max(self._errors["collision"].values())
-                print('\t Simulation had {0} {1}\n'.format(collision_violations, self._errors["collision_string"]))
-            if "actuator" in self._errors:
-                print('\t Simulation had {0} {1}'.format(self._errors["actuator"], self._errors["actuator_string"]))
-        else:
-            print('No errors in your simulation! Acceptance of your experiment is likely!')
-
-        return
-
-    def step(self):
-        """Increments the simulation by updating the dynamics.
-        """
-        assert(not self._called_step_already), "Make sure to call get_poses before calling step() again."
+    def __init__(self, **kwargs):
         
-        # Allow get_poses function to be called again.
-        self._called_step_already = True
-        self._checked_poses_already = False
+        # 1.**kwargs parsing
+        number_of_robots = kwargs.get('number_of_robots', -1)
+        show_figure = kwargs.get('show_figure', False)
+        initial_conditions = kwargs.get('initial_conditions', np.array([]))
+        use_distance_sensors = kwargs.get('use_distance_sensors', False)
+        obstacles = kwargs.get('obstacles', None)
+        sim_in_real_time = kwargs.get('sim_in_real_time', True)
+        skip_initialization = kwargs.get('skip_initialization', False)
+        show_arena_boundaries = kwargs.get("show_arena_boundaries", True)
+        show_robot_patches = kwargs.get("show_robot_patches", True)
+        show_distance_endpoints = kwargs.get("show_distance_endpoints", True)
+        show_distance_rays = kwargs.get("show_distance_rays", False)
+        show_obstacles = kwargs.get("show_obstacles", True)
 
-        # Validate before thresholding velocities
-        self._errors = self._validate()
-        self._iterations += 1
+        # 2. Strict Type Checking
+        assert isinstance(number_of_robots, int), f"NumberOfRobots must be an integer. Received type {type(number_of_robots).__name__}."
+        assert isinstance(show_figure, bool), f"ShowFigure must be a boolean. Received type {type(show_figure).__name__}."
+        assert isinstance(sim_in_real_time, bool), f"SimInRealTime must be a boolean. Received type {type(sim_in_real_time).__name__}."
+        assert isinstance(use_distance_sensors, bool), f"UseDistanceSensors must be a boolean. Received type {type(use_distance_sensors).__name__}."
+        assert isinstance(initial_conditions, np.ndarray), f"InitialConditions must be a numpy ndarray. Received type {type(initial_conditions).__name__}."
 
-        #Perform Thresholding of Motors
-        self.velocities = self._threshold(self.velocities)
+        initial_poses = generate_initial_poses(
+            number_of_robots,
+            width=ARobotarium.BOUNDARIES[1] - ARobotarium.BOUNDARIES[0] - ARobotarium.ROBOT_DIAMETER,
+            height=ARobotarium.BOUNDARIES[3] - ARobotarium.BOUNDARIES[2] - ARobotarium.ROBOT_DIAMETER,
+        )
 
-        # Update dynamics of agents
-        self.poses[0, :] = self.poses[0, :] + self.time_step*np.cos(self.poses[2,:])*self.velocities[0, :]
-        self.poses[1, :] = self.poses[1, :] + self.time_step*np.sin(self.poses[2,:])*self.velocities[0, :]
-        self.poses[2, :] = self.poses[2, :] + self.time_step*self.velocities[1, :]
-        # Ensure angles are wrapped
-        self.poses[2, :] = np.arctan2(np.sin(self.poses[2, :]), np.cos(self.poses[2, :]))
-
-        # Simulate encoder readings
-        self._simulate_encoder_readings()
-
-        # Simulate distance measurements
-        if self.distance_sensors_enabled:
-            self._simulate_distance_measurements()
-
-        # Simulate IMU measurements
-        self._simulate_accelerations()
-        self._simulate_gyros()
-        self._simulate_magnetometers()
-        self._simulate_orientation()
-
-        # Update graphics
-        if(self.show_figure):
-            for i in range(self.number_of_robots):
-                # self.chassis_patches[i].xy = self.poses[:2, i] + self.robot_radius*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i])))
-                # if i == 0:
-                #     print(self.poses[2, i] - math.pi/2)
-                #     print('='*50)
-
-                # self.chassis_patches[i].xy = self.poses[:2, i] + np.array(-self.robot_width/2 * np.sin(self.poses[2, i] + math.pi/2), self.robot_length/2 * np.cos(self.poses[2,i] + math.pi/2))
-                self.chassis_patches[i].xy = self.poses[:2, i]+self.robot_length/2*np.array((np.cos(self.poses[2, i]+math.pi/2), np.sin(self.poses[2, i]+math.pi/2)))+\
-                                        0.04*np.array((-np.sin(self.poses[2, i]+math.pi/2), np.cos(self.poses[2, i]+math.pi/2)))  + self.robot_length/2*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i])))
-                # self.chassis_patches[i].orientation = self.poses[2, i] + math.pi/4
-                self.chassis_patches[i].angle = (self.poses[2, i] - math.pi/2) * 180/math.pi
-
-                self.chassis_patches[i].zorder = 2
-
-                self.right_wheel_patches[i].center = self.poses[:2, i]+self.robot_length/2*np.array((np.cos(self.poses[2, i]+math.pi/2), np.sin(self.poses[2, i]+math.pi/2)))+\
-                                        0.04*np.array((-np.sin(self.poses[2, i]+math.pi/2), np.cos(self.poses[2, i]+math.pi/2)))  + self.robot_length/2*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i])))
-                self.right_wheel_patches[i].orientation = self.poses[2, i] + math.pi/4
-
-                self.right_wheel_patches[i].zorder = 2
-
-                self.left_wheel_patches[i].center = self.poses[:2, i]+self.robot_length/2*np.array((np.cos(self.poses[2, i]-math.pi/2), np.sin(self.poses[2, i]-math.pi/2)))+\
-                                        0.04*np.array((-np.sin(self.poses[2, i]+math.pi/2), np.cos(self.poses[2, i]+math.pi/2))) + self.robot_length/2*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i])))
-                self.left_wheel_patches[i].orientation = self.poses[2,i] + math.pi/4
-
-                self.left_wheel_patches[i].zorder = 2
-                
-                self.led_patches[i].center = self.poses[:2, i]+0.75*self.robot_length/2*np.array((np.cos(self.poses[2,i]), np.sin(self.poses[2,i])))-\
-                                0.015*np.array((-np.sin(self.poses[2, i]), np.cos(self.poses[2, i]))) + self.robot_length/2*np.array((np.cos(self.poses[2, i]), np.sin(self.poses[2, i])))
-                # self.base_patches[i].center = self.poses[:2, i]
-
-                self.led_patches[i].zorder = 2
-
-                # Update distance sensor rays
-                if self.distance_sensors_enabled:
-                    self.distance_ray_patch.set_offsets(self.distance_end_points.T)
-
-            self.figure.canvas.draw_idle()
-            self.figure.canvas.flush_events()
-
-        if(self.sim_in_real_time):
-                t = time.time()
-                while(t - self.previous_render_time < self.time_step):
-                    t=time.time()
-                self.previous_render_time = t
-
-    def _simulate_encoder_readings(self):
-        # Simulate encoder readings based on wheel velocities
-        left_motor_angular_velocity = self._uni_to_diff(self.velocities)[0, :]
-        right_motor_angular_velocity = self._uni_to_diff(self.velocities)[1, :]
-
-        delta_encoder = self.encoder_counts_per_revolution*self.motor_gear_ratio/(2*np.pi)*np.vstack((left_motor_angular_velocity, right_motor_angular_velocity))*self.time_step
-        
-        # Per-count noise: error std scales with sqrt(number of counts) in this step
-        n_counts = np.maximum(np.abs(delta_encoder), 1.0)
-        step_noise_std = self.encoder_noise_std * np.sqrt(n_counts)
-        encoder_noise = np.random.normal(0, step_noise_std, delta_encoder.shape)
-        delta_encoder += encoder_noise
-        self.encoders += np.round(delta_encoder) # this is another source of noise with an std of 0.5
-
-    def _simulate_distance_measurements(self):
-        """ Simulates the distance sensor readings for all robots in the Robotarium.
-
-        For each robot and each of its sensors, this function:
-            1. Computes the global position and orientation of the sensor.
-            2. Casts a ray in the sensor direction and finds intersections with
-                obstacles and other robots.
-            3. Adds realistic sensor effects:
-                - Gaussian noise around the true distance.
-                - Random “outlier” measurements (random readings anywhere in the distance sensor range).
-                - Random dropouts (sensor returns no measurement).
-            4. Clamps all readings to the valid sensor range and converts NaNs to -1
-                to match the Robotarium API.
-        
-        This allows testing algorithms with realistic, noisy distance data
-        similar to what physical robots would produce. """
-        
-        N_sensors = self.distance_sensors_orientation.shape[1]
-        N_obstacles = self.obstacles.shape[0]
-        self.distances = -1*np.ones((N_sensors, self.number_of_robots))  # Reset distances
-
-        # Find global positions and orientations of distance sensors
-        R = rotation_matrix(self.poses[2, :]) # N x 3 x 3
-        poses = self.poses.T[:, :, None] # N x 3 x 1 for batch matrix multiplication
-        global_sensors = poses + np.matmul(R, self.distance_sensors_orientation)  # N x 3 x 7
-
-        # Calculate the endpoints of each sensor ray at max range
-        R_sensor = rotation_matrix(global_sensors[:, 2, :]) # N x 3 x 3
-        max_distances = np.stack([self.distance_sensor_range*np.ones((self.number_of_robots*N_sensors, 1)),
-                                    np.zeros((self.number_of_robots*N_sensors, 1)),
-                                    np.zeros((self.number_of_robots*N_sensors, 1))], axis = 1) # 7*N x 3 x 1
-        sensor_endpoints_local = np.matmul(R_sensor, max_distances).squeeze(-1).reshape(self.number_of_robots, N_sensors, 3).transpose(0, 2, 1)  # N x 3 x 7
-        sensor_endpoints = global_sensors[:, 0:2, :] + sensor_endpoints_local[:, 0:2, :]  # N x 2 x 7
-        self.distance_end_points = sensor_endpoints.transpose(1, 0, 2).reshape(2, self.number_of_robots*N_sensors) # 2 x N*7
-
-        # Compute intersections of each sensor ray with each obstacle
-        r_all = sensor_endpoints - global_sensors[:, 0:2, :]  # N x 2 x 7. Vectors from sensor origin to max range endpoint
-        s_all = self.obstacles[:, :, 1] - self.obstacles[:, :, 0]  # N x 2 x 2. Vectors from start to end of each obstacle edge
-        s_all = s_all.reshape(N_obstacles, 2, 1) # num_obstacle x 2 x 1 for batch matrix multiplication
-
-        for i in range(self.number_of_robots):
-            rxs = r_all[i, 0, :].reshape(1, 1, N_sensors)*s_all[:, 1, :].reshape(N_obstacles, 1, 1) - \
-                    r_all[i, 1, :].reshape(1, 1, N_sensors)*s_all[:, 0, :].reshape(N_obstacles, 1, 1)  # num_obstacles x 1 x N_sensors
-            q = self.obstacles[:, :, 0].reshape(N_obstacles, 2, 1) - global_sensors[i, 0:2, :].reshape(1, 2, 7)  # num_obstacles x 2 x N_sensors
-            qxs = q[:, 0, :].reshape(N_obstacles, 1, N_sensors)*s_all[:, 1, :].reshape(N_obstacles, 1, 1) - \
-                    q[:, 1, :].reshape(N_obstacles, 1, N_sensors)*s_all[:, 0, :].reshape(N_obstacles, 1, 1)  # num_obstacles x 1 x N_sensors
-            qxr = q[:, 0, :].reshape(N_obstacles, 1, N_sensors)*r_all[i, 1, :].reshape(1, 1, N_sensors) - \
-                    q[:, 1, :].reshape(N_obstacles, 1, N_sensors)*r_all[i, 0, :].reshape(1, 1, N_sensors)  # num_obstacles x 1 x N_sensors
-
-            # Avoid divide-by-zero when the ray and obstacle segment are parallel (rxs == 0)
-            t = np.full_like(qxs, np.nan, dtype=float)  # num_obstacles x 1 x N_sensors
-            u = np.full_like(qxr, np.nan, dtype=float)  # num_obstacles x 1 x N_sensors
-            rxs_nonzero = rxs != 0
-            np.divide(qxs, rxs, out=t, where=rxs_nonzero)  # Parameter for the intersection on the sensor lines
-            np.divide(qxr, rxs, out=u, where=rxs_nonzero)  # Parameter for the intersection on the obstacle lines
-
-            parameter_on_line = np.logical_and(np.logical_and(t >= 0, t <= 1), np.logical_and(u >= 0, u <= 1)) # num_obstacles x 1 x N_sensors
-            valid_parameter = t*parameter_on_line # num_obstacles x 1 x N_sensors
-            # valid_parameter[~parameter_on_line] = self.distance_sensor_range # num_obstacles x 1 x N_sensors. Set invalid intersections to NaN
-            valid_parameter[~parameter_on_line] = np.nan # num_obstacles x 1 x N_sensors. Set invalid intersections to NaN
-
-            # Check if any rays intersect other robots
-            f = global_sensors[i, 0:2, :].reshape(1, 2, N_sensors) - self.poses[:2, :].T.reshape(self.number_of_robots, 2, 1)  # N x 2 x N_sensors. Vectors from other robots to sensor origin
-            a = r_all[i, 0, :].reshape(1, 1, N_sensors)**2 + r_all[i, 1, :].reshape(1, 1, N_sensors)**2  # 1 x 1 x N_sensors. Squared magnitude of ray direction vectors
-            b = 2*(f[:, 0, :].reshape(self.number_of_robots, 1, N_sensors)*r_all[i, 0, :].reshape(1, 1, N_sensors) + \
-                    f[:, 1, :].reshape(self.number_of_robots, 1, N_sensors)*r_all[i, 1, :].reshape(1, 1, N_sensors))  # N x 1 x N_sensors. Dot product of 2*f and ray direction vectors
-            c = f[:, 0, :].reshape(self.number_of_robots, 1, N_sensors)**2 + f[:, 1, :].reshape(self.number_of_robots, 1, N_sensors)**2 - \
-                self.robot_radius**2  # N x 1 x N_sensors. Squared magnitude of f minus robot radius squared
-            discriminant = b**2 - 4*a*c  # N x 1 x N_sensors. Discriminant of quadratic formula
-            # Only take sqrt where discriminant is non-negative; otherwise there is no real intersection.
-            # This avoids RuntimeWarning: invalid value encountered in sqrt.
-            t_circle = np.full_like(discriminant, np.nan, dtype=float)  # N x 1 x N_sensors
-            sqrt_discriminant = np.full_like(discriminant, np.nan, dtype=float)
-            real_intersection = np.logical_and(discriminant >= 0, a > 0)
-            np.sqrt(discriminant, out=sqrt_discriminant, where=real_intersection)
-            np.divide(-b - sqrt_discriminant, 2*a, out=t_circle, where=real_intersection)
-
-            parameter_on_line_circle = np.logical_and(t_circle >= 0, t_circle <= 1)  # N x 1 x N_sensors
-            valid_parameter_circle = t_circle*parameter_on_line_circle  # N x 1 x N_sensors
-            # valid_parameter_circle[~parameter_on_line_circle] = self.distance_sensor_range  # N x 1 x N_sensors. Set invalid intersections to max range
-            valid_parameter_circle[~parameter_on_line_circle] = np.nan  # N x 1 x N_sensors. Set invalid intersections to NaN
-            
-            valid_parameter_all = np.vstack((valid_parameter, valid_parameter_circle))  # Combine obstacle and robot intersection parameters
-            # Avoid RuntimeWarning: All-NaN slice encountered (no intersections)
-            min_parameter = np.min(np.where(np.isnan(valid_parameter_all), np.inf, valid_parameter_all), axis=0).squeeze(0)  # 1 x N_sensors
-            min_parameter[np.isinf(min_parameter)] = np.nan
-            # self.distances[:, i] = min_parameter + self.distance_sensor_error*(2*np.random.rand(1, N_sensors) - 1)  # Add noise to distance measurements
-            
-            # =========================================
-            # Mixture sensor model
-            # =========================================
-
-            p_d = self.distance_sensor_dropout_prob
-            p_o = self.distance_sensor_outlier_prob
-
-            noisy_parameter = min_parameter.copy()
-            valid = ~np.isnan(min_parameter)
-
-            # Single random draw per measurement
-            u = np.random.rand(N_sensors)
-
-            # Mutually exclusive masks
-            dropout_mask = (u < p_d)
-            outlier_mask = (u >= p_d) & (u < p_d + p_o)
-            nominal_mask = (u >= p_d + p_o)
-
-            # --- Gaussian noise ---
-            nominal_valid = nominal_mask & valid
-
-            sigma = self.distance_sensor_error * min_parameter[nominal_valid]
-            noise = sigma * np.random.randn(sigma.shape[0])
-            noise = np.clip(noise, -3*sigma, 3*sigma)       # Clip Gaussian noise to ±3σ
-
-            noisy_parameter[nominal_valid] = (
-                min_parameter[nominal_valid] + noise
+        if initial_conditions.size == 0:
+            initial_conditions = generate_random_poses(
+                number_of_robots,
+                spacing=0.5,
+                width=2.75,
+                height=1.75,
             )
 
-            # --- Outliers ---
-            outlier_valid = outlier_mask & valid
-            random_values = self.distance_sensor_range * np.random.rand(N_sensors)      # get a random reading w/ uniform prob in dist sens range
-            noisy_parameter[outlier_valid] = random_values[outlier_valid]
+        super().__init__(
+            number_of_robots=number_of_robots,
+            show_figure=show_figure,
+            initial_conditions=initial_poses,
+            use_distance_sensors=use_distance_sensors,
+            obstacles=obstacles,
+            show_arena_boundaries=show_arena_boundaries,
+            show_robot_patches=show_robot_patches,
+            show_distance_endpoints=show_distance_endpoints,
+            show_distance_rays=show_distance_rays,
+            show_obstacles=show_obstacles
+        )
 
-            # --- Dropouts ---
-            noisy_parameter[dropout_mask] = np.nan
+        self._sim_in_real_time = sim_in_real_time
+        self._previous_render_time = time.time()
+        self._called_step_already   = True
+        self._checked_poses_already = False
+        self._errors    = {}
+        self._iteration = 0
 
-            # --- Clamp valid values ---
-            valid_after = ~np.isnan(noisy_parameter)
-            noisy_parameter[valid_after] = np.clip(noisy_parameter[valid_after], 0, self.distance_sensor_range)
+        if skip_initialization:
+            self._poses = initial_conditions.copy()
+        else:
+            self.initialize(initial_conditions)
+        self.initializing = False
 
-            self.distances[:, i] = noisy_parameter
-
-        # Find the endpoint of each sensor ray
-        distance_end_points = global_sensors[:, 0:2, :] + self.distances.T.reshape(self.number_of_robots, 1, N_sensors)*r_all # N x 2 x 7
-        self.distance_end_points = distance_end_points.transpose(1, 0, 2).reshape(2, self.number_of_robots*N_sensors) # 2 x N*7
-
-        # Convert NaN distances to -1 for consistency with real robot API
-        self.distances[np.isnan(self.distances)] = -1
-
-    def _simulate_accelerations(self):
+    def initialize(self, initial_conditions: NDArray[np.floating]) -> None:
         """
-        Simulates the accelerometer readings for the robots based on their current velocities and the physics of the system. This includes:
-            - Translational acceleration (change in linear velocity)
-            - Tangential acceleration (due to angular acceleration)
-            - Centripetal acceleration (due to angular velocity)
+        Drive to the initial conditions
 
-        Additionally, the IMU is oriented such that the X-axis points forward, the Y-axis points left, and the Z-axis points up.
+        Note: This is the algorithm we use to drive robots onto the testbed so if
+        your experiment cannot consistently reach the initial conditions, it will likely
+        be rejected during verification
         """
-        linear_accelerations = ((self.velocities[0, :] - self.velocities_old[0, :])/self.time_step).reshape(1, self.number_of_robots)  # 1 x N
-        angular_accelerations = ((self.velocities[1, :] - self.velocities_old[1, :])/self.time_step).reshape(1, self.number_of_robots)  # 1 x N
-        omega_z = self.velocities[1, :].reshape(1, self.number_of_robots)  # 1 x N
+        # Initialize the barrier, controller, and at pose checker
+        print(f"Initializing {self.number_of_robots} robots to initial conditions...")
+        init_label = None
+        if self.show_figure:
+            font_size = determine_font_size(self, 0.1)
+            init_label = self._axes_handle.text( 
+                0,
+                -0.5,
+                "...INITIALIZING...",
+                fontsize=font_size,
+                color='b',
+                fontweight='bold',
+                horizontalalignment='center',
+                verticalalignment='center',
+                zorder=999,
+            )
 
-        translational_acceleration = np.vstack((
-            linear_accelerations,
-            np.zeros((1, self.number_of_robots)),
-            np.zeros((1, self.number_of_robots))
-        ))
+        barrier = create_uni_barrier_certificate()
+        controller = create_pose_controller_hybrid(
+            angular_velocity_limit=np.pi / 3.0,
+            position_epsilon=0.03,
+            position_error=0.05,
+            rotation_error=0.1
+        )
+        at_pose = create_at_pose(position_error=0.05, rotation_error=0.2)
 
-        tangential_acceleration = np.vstack((
-            -angular_accelerations * self.imu_orientation[1],
-            angular_accelerations * self.imu_orientation[0],
-            np.zeros((1, self.number_of_robots))
-        ))
+        # Drive to initial conditions
+        x = self.get_poses()
 
-        centripetal_acceleration = np.vstack((
-            -omega_z**2 * self.imu_orientation[0],
-            -omega_z**2 * self.imu_orientation[1],
-            np.zeros((1, self.number_of_robots))
-        ))
+        # When robot's deadlock due to the barriers we will give them an intermediate waypoint to drive towards
+        # to break the deadlock
+        step = 0
+        deadlock_steps = 5 * 30
+        deadlock_epsilon = 0.1
+        timers = np.array([0] * self.number_of_robots)
+        last_deadlock_poses = x.copy()
+        waypointing = np.array([False] * self.number_of_robots)
+        waypoints = generate_random_poses(self.number_of_robots, spacing=0.4, width=2.75, height=1.75)
 
-        gravity = np.vstack((
-            np.zeros((1, self.number_of_robots)),
-            np.zeros((1, self.number_of_robots)),
-            -9.81*np.ones((1, self.number_of_robots))
-        ))
+        self.step()
+        while not at_pose(x, initial_conditions)[0]:
+            x = self.get_poses()
+            dxu = controller(x, initial_conditions)
+            
+            initialized_ids = at_pose(x, initial_conditions)[1]
+            uninit_ids = np.arange(0, self.number_of_robots)[~np.isin(np.arange(0, self.number_of_robots), initialized_ids)]
+            for i in uninit_ids:
+                if waypointing[i]:
+                    dxu[:, i] = controller(x[:, i].reshape(-1, 1), waypoints[:, i].reshape(-1, 1)).squeeze(1)
+                    if np.linalg.norm(last_deadlock_poses[:2, i] - x[:2, i]) > 0.1:
+                        waypointing[i] = False
+                    elif step - timers[i] > deadlock_steps:
+                        waypoints[:, i] = np.array([
+                            np.random.uniform(
+                                low=min(x[0, i] + 0.25, self.BOUNDARIES[1]),
+                                high=max(x[0, i] - 0.25, self.BOUNDARIES[0])
+                            ),
+                            np.random.uniform(
+                                low=min(x[1, i] + 0.25, self.BOUNDARIES[3]),
+                                high=max(x[1, i] - 0.25, self.BOUNDARIES[2])
+                            ),
+                            np.random.uniform(low=-np.pi, high=np.pi)
+                        ])
+                        timers[i] = step
+                elif step - timers[i] > deadlock_steps and np.linalg.norm(last_deadlock_poses[:2, i] - x[:2, i]) < deadlock_epsilon:
+                    waypointing[i] = True
+                    waypoints[:, i] = np.array([
+                        np.random.uniform(
+                            low=min(x[0, i] + 0.25, self.BOUNDARIES[1]),
+                            high=max(x[0, i] - 0.25, self.BOUNDARIES[0])
+                        ),
+                        np.random.uniform(
+                            low=min(x[1, i] + 0.25, self.BOUNDARIES[3]),
+                            high=max(x[1, i] - 0.25, self.BOUNDARIES[2])
+                        ),
+                        np.random.uniform(low=-np.pi, high=np.pi)
+                    ])
+                    timers[i] = step
+                elif np.linalg.norm(last_deadlock_poses[:2, i] - x[:2, i]) > deadlock_epsilon or \
+                     np.linalg.norm(controller(x[:, i].reshape(-1, 1), initial_conditions[:, i].reshape(-1, 1)).squeeze(1)) <= 0.1:
+                    timers[i] = step
+                    last_deadlock_poses[:, i] = x[:, i].copy()
 
-        imu_accelerations = translational_acceleration + tangential_acceleration + centripetal_acceleration + gravity
+            step += 1
+            dxu_safe = barrier(dxu, x)
+            self.set_velocities(np.arange(self.number_of_robots), dxu_safe)
+            self.step()
 
-        # Apply noise to accelerations
-        x_noise = np.random.normal(0, self.accelerometer_noise_stds[0], self.number_of_robots)
-        y_noise = np.random.normal(0, self.accelerometer_noise_stds[1], self.number_of_robots)
-        z_noise = np.random.normal(0, self.accelerometer_noise_stds[2], self.number_of_robots)
+        print("At initial conditions... Starting Experiment")
+        if init_label is not None:
+            init_label.remove()
 
-        self.accelerations = np.vstack((
-            imu_accelerations[0, :] + x_noise,
-            imu_accelerations[1, :] + y_noise,
-            imu_accelerations[2, :] + z_noise
-        ))
+    def get_poses(self) -> NDArray[np.floating]:
+        assert not self._checked_poses_already, "Can only call get_poses() once per call of step()!"
+        self._called_step_already  = False
+        self._checked_poses_already = True
+        return self._poses.copy()
 
-    def _simulate_gyros(self):
-        """
-        Simulates the gyrometer readings for the robot based on their current angular velocities.
-        The gyros measure the angular velocity around the Z-axis (yaw rate) with some added noise.
-        """
-        self.gyros = np.vstack((
-            np.random.normal(0, self.gyro_noise_stds[0], self.number_of_robots),  # X-axis gyro noise
-            np.random.normal(0, self.gyro_noise_stds[1], self.number_of_robots),  # Y-axis gyro noise
-            self.velocities[1, :] + np.random.normal(0, self.gyro_noise_stds[2], self.number_of_robots)   # Z-axis gyro measurement with noise
-        ))
+    def step(self) -> None:
+        assert not self._called_step_already, "Make sure you call get_poses before calling step()!"
+        self._called_step_already   = True
+        self._checked_poses_already = False
 
-    def _simulate_magnetometers(self):
-        """
-        Simulates the magnetometer readings for each robot based on their orientation in the testbed.
+        self._errors = self._validate(self._errors)
+        self._iteration += 1
 
-        Note: in the testbed, magnetic fields are corrected such that magnetic north is the x-axis of the testbed.
-        """
-        return np.vstack((
-            self.magnetometer_xy_avg * np.cos(self.poses[2, :]) + np.random.normal(0, self.magnetometer_noise_stds[0], self.number_of_robots),   # X-axis
-            -self.magnetometer_xy_avg * np.sin(self.poses[2, :]) + np.random.normal(0, self.magnetometer_noise_stds[1], self.number_of_robots),   # Y-axis
-            self.magnetometer_z_avg  + np.random.normal(0, self.magnetometer_noise_stds[2], self.number_of_robots)                               # Z-axis
-        ))
+        self._velocities = self._threshold(self._velocities)
+        self._velocities_old = self._velocities.copy()
 
-    def _simulate_orientation(self):
-        """
-        Simulates the orientation readings for each robot based on their current pose and some added noise.
+        # Unicycle dynamics integration
+        i = np.arange(self.number_of_robots)
+        temp = self.TIME_STEP * self._velocities[0, i]
+        self._poses[0, i] += temp * np.cos(self._poses[2, i])
+        self._poses[1, i] += temp * np.sin(self._poses[2, i])
+        self._poses[2, i] += self.TIME_STEP * self._velocities[1, i]
 
-        Note: On the robotarium, a sensor fusion algorithm is run on the IMU data to produce a stable orientation estimate.
-        """
-        orientation_degrees = np.rad2deg(self.poses[2, :])
-        self.orientations = (orientation_degrees + np.random.normal(0, self.orientation_noise_std, self.number_of_robots)) % 360
+        self._poses[2, i] = np.arctan2(np.sin(self._poses[2, i]), np.cos(self._poses[2, i]))
 
+        # Distance Sensors
+        if self._distance_sensors_enabled:
+            self._distances = simulate_distance_sensors(
+                poses=self._poses,
+                obstacles=self.obstacles,
+                distance_sensors_orientation=self.DISTANCE_SENSORS_ORIENTATION,
+                robot_diameter=self.ROBOT_DIAMETER,
+                robot_center_offset=self.CENTER_OFFSET,
+                distance_sensor_range=self.DISTANCE_SENSOR_RANGE,
+                distance_sensor_error=self.DISTANCE_SENSOR_ERROR,
+                distance_sensor_dropout_prob=self.DISTANCE_SENSOR_DROPOUT_PROB,
+                distance_sensor_outlier_prob=self.DISTANCE_SENSOR_OUTLIER_PROB,
+            )
+            self._distance_endpoints = self._calculate_endpoints(self._distances)
+
+        self.simulate_encoder_readings()
+        self.simulate_accelerations()
+        self.simulate_gyros()
+        self.simulate_magnetometers()
+        self.simulate_orientations()
+
+        # Update figure
+        if self.show_figure:
+            self._draw_robots()
+            if not self.initializing and self._distance_sensors_enabled and self.show_distance_endpoints:
+                self._draw_distance_endpoints(self._distance_endpoints)
+            if not self.initializing and self._distance_sensors_enabled and self.show_distance_rays:
+                self._draw_distance_rays(self._distance_endpoints)
+
+        # Throttle the simulation to match real time using a busy-wait timer
+        if self._sim_in_real_time:
+            while time.time() - self._previous_render_time < self.TIME_STEP:
+                pass
+            self._previous_render_time = time.time()
+
+    def simulate_encoder_readings(self) -> None:
+        dxdd = self._uni_to_diff(self._velocities)
+        # dxdd is wheel angular velocity (rad/s) from _uni_to_diff — matches MATLAB's motor_angular_velocity.
+        # Formula: (counts/rev) * gear_ratio / (2*pi rad/rev) * (rad/s) * (s) = counts.
+        # Do NOT divide by WHEEL_RADIUS — that would double-convert from angular to linear.
+        delta = dxdd * self.TIME_STEP * self.ENCODER_COUNTS_PER_REVOLUTION * self.MOTOR_GEAR_RATIO / (2 * np.pi)
+        # Per-count noise: std scales with sqrt(number of counts), floored at 1 count — matches MATLAB
+        n_counts = np.maximum(np.abs(delta), 1.0)
+        step_noise_std = self.ENCODER_NOISE_STD * np.sqrt(n_counts)
+        delta += step_noise_std * np.random.randn(*delta.shape)
+        self._encoders += np.round(delta)
+
+    def simulate_accelerations(self) -> None:
+        N = self.number_of_robots
+        linear_acc = (self._velocities[0, :] - self._velocities_old[0, :]) / self.TIME_STEP
+        angular_acc = (self._velocities[1, :] - self._velocities_old[1, :]) / self.TIME_STEP
+        omega_z = self._velocities[1, :]
+
+        translational = np.vstack([linear_acc, np.zeros(N), np.zeros(N)])
+        tangential = np.vstack([
+            -angular_acc * self.IMU_ORIENTATION[1],
+             angular_acc * self.IMU_ORIENTATION[0],
+             np.zeros(N)
+        ])
+        centripetal = np.vstack([
+            -np.square(omega_z) * self.IMU_ORIENTATION[0],
+            -np.square(omega_z) * self.IMU_ORIENTATION[1],
+             np.zeros(N)
+        ])
+        gravity = np.vstack([np.zeros(N), np.zeros(N), -9.81 * np.ones(N)])
+
+        imu_acc = translational + tangential + centripetal + gravity
+        noise = self.ACCELEROMETER_NOISE_STDS.reshape(3, 1) * np.random.randn(3, N)
+        self._accelerations = imu_acc + noise
+
+    def simulate_gyros(self) -> None:
+        N = self.number_of_robots
+        omega_z = self._velocities[1, :]
+        noise = self.GYRO_NOISE_STDS.reshape(3, 1) * np.random.randn(3, N)
+        self._gyros = np.vstack([np.zeros(N), np.zeros(N), omega_z]) + noise
+
+    def simulate_magnetometers(self) -> None:
+        N = self.number_of_robots
+        theta = self._poses[2, :]
+        noise = self.MAGNETOMETER_NOISE_STDS.reshape(3, 1) * np.random.randn(3, N)
+        self._magnetic_fields = np.vstack([
+             self.MAGNETOMETER_XY_AVG * np.cos(theta),
+            -self.MAGNETOMETER_XY_AVG * np.sin(theta),
+             self.MAGNETOMETER_Z_AVG  * np.ones(N),
+        ]) + noise
+
+    def simulate_orientations(self) -> None:
+        N = self.number_of_robots
+        orientation_degrees = self._poses[2, :] * (180.0 / np.pi)
+        noise = self.ORIENTATION_NOISE_STD * np.random.randn(N)
+        self._orientations = np.mod(orientation_degrees + noise, 360.0)
+
+    def debug(self) -> None:
+        elapsed = self._iteration * self.TIME_STEP
+        print(f"Your simulation took approximately {elapsed:.2f} real seconds to execute.\n")
+
+        too_close    = self._errors.get('robots_too_close', 0)
+        out_of_bounds = self._errors.get('robots_outside_boundaries', 0)
+        actuator     = self._errors.get('exceeded_actuator_limits', 0)
+        hard_errors  = too_close + out_of_bounds
+
+        if hard_errors == 0 and actuator == 0:
+            print("No errors or warnings in your simulation!  Your script will run on the Robotarium!\n")
+        elif hard_errors == 0:
+            print("No hard errors detected, your script will run on the Robotarium!\n")
+            print(
+                f"WARNING: {actuator} out of {self._iteration} "
+                f"(~{100 * actuator / max(self._iteration, 1):.0f}%) timesteps had velocity "
+                f"command(s) exceed actuator limits.\n"
+                f"         A large percentage of exceeded actuator commands will cause noticeable\n"
+                f"         differences between this simulation and the physical Robotarium."
+            )
+        else:
+            print("Errors detected, your script will NOT run on the Robotarium!\n")
+            print("Errors:")
+            if too_close:
+                print(f"\t Simulation had {too_close} time steps where robots were too close (potential collision).")
+            if out_of_bounds:
+                print(f"\t Simulation had {out_of_bounds} time steps where robots were outside boundaries.")
+            print("\nPlease fix the noted errors in your simulation; otherwise, your experiment will be rejected.")

@@ -1,78 +1,109 @@
-#Import Robotarium Utilities
+import numpy as np
 import rps.robotarium as robotarium
-from rps.utilities.transformations import *
-from rps.utilities.graph import *
-from rps.utilities.barrier_certificates import *
-from rps.utilities.misc import *
-from rps.utilities.controllers import *
+from rps.utilities.graph import topological_neighbors
+from rps.utilities.transformations import create_si_to_uni_dynamics
+from rps.utilities.barrier_certificates import create_si_barrier_certificate_with_boundary
+from rps.utilities.misc import generate_random_poses
 
-# Array representing the geometric distances betwen the agents.  In this case,
-# the agents try to form a Rectangle
-L = np.array([
-    [3, -1, 0, -1, 0, -1],
-    [-1, 3, -1, 0, -1, 0],
-    [0, -1, 3, -1, 0, -1],
-    [-1, 0 , -1, 3, -1, 0],
-    [0, -1, 0, -1, 3, -1],
-    [-1, 0, -1, 0, -1, 3]
-])
-
-# Some gains for this experiment.  These aren't incredibly relevant.
-d = 0.3
-ddiag = np.sqrt(5)*d
+# =========================================================
+# SIMULATION PARAMETERS
+# =========================================================
+N = 6
+iterations = 3000
 formation_control_gain = 10
 
-# Weight matrix to control inter-agent distances
-weights = np.array([
-    [0, d, 0, d, 0, ddiag],
-    [d, 0, d, 0, d, 0],
-    [0, d, 0, ddiag, 0, d],
-    [d, 0, ddiag, 0, d, 0],
-    [0, d, 0, d, 0, d],
-    [ddiag, 0, d, 0, d, 0]
+# =========================================================
+# ROBOTARIUM INITIALIZATION
+# =========================================================
+# Initializing with the updated Width/Height/Spacing from MATLAB
+initial_conditions = generate_random_poses(
+    N, 
+    width=2, 
+    height=1, 
+    spacing=0.5
+)
+
+r = robotarium.Robotarium(
+    number_of_robots=N, 
+    show_figure=True, 
+    initial_conditions=initial_conditions,
+    sim_in_real_time=True
+)
+
+# =========================================================
+# GRAPH TOPOLOGY
+# =========================================================
+# Laplacian for a 2D-rigid hexagonal formation
+L = np.array([
+    [ 3, -1,  0, -1,  0, -1],
+    [-1,  3, -1,  0, -1,  0],
+    [ 0, -1,  3, -1,  0, -1],
+    [-1,  0, -1,  3, -1,  0],
+    [ 0, -1,  0, -1,  3, -1],
+    [-1,  0, -1,  0, -1,  3]
 ])
 
-# Experiment constants
-iterations = 2000
-N = 6
+# =========================================================
+# FORMATION GEOMETRY
+# =========================================================
+d = 0.5
+d_long = 2 * d
 
-#Limit maximum linear speed of any robot
-magnitude_limit = 0.15
+# Weight matrix for desired inter-agent distances
+weights = np.array([
+    [0,      d,      0,      d_long, 0,      d     ],
+    [d,      0,      d,      0,      d_long, 0     ],
+    [0,      d,      0,      d,      0,      d_long],
+    [d_long, 0,      d,      0,      d,      0     ],
+    [0,      d_long, 0,      d,      0,      d     ],
+    [d,      0,      d_long, 0,      d,      0     ]
+])
 
-r = robotarium.Robotarium(number_of_robots=N, show_figure=True, sim_in_real_time=True)
-si_barrier_cert = create_single_integrator_barrier_certificate_with_boundary()
-si_to_uni_dyn = create_si_to_uni_dynamics()
+# =========================================================
+# CONTROLLER AND SAFETY SETUP
+# =========================================================
+# Single-integrator barrier certificate for safety
+si_barrier_cert = create_si_barrier_certificate_with_boundary()
 
-for k in range(iterations):
+# Mapping with specific MATLAB gains
+si_to_uni_dyn = create_si_to_uni_dynamics(
+    linear_velocity_gain=0.5, 
+    angular_velocity_limit=np.pi/2
+)
 
-    # Get the poses of the robots
+# =========================================================
+# MAIN SIMULATION LOOP
+# =========================================================
+for t in range(iterations):
     x = r.get_poses()
-
-    # Initialize a velocity vector
     dxi = np.zeros((2, N))
 
+    # Formation control algorithm using edge tension energy
     for i in range(N):
-        for j in topological_neighbors(L, i):
-            # Perform a weighted consensus to make the rectangular shape
-            error = x[:2, j] - x[:2, i]
-            dxi[:, i] += formation_control_gain*(np.power(np.linalg.norm(error), 2)- np.power(weights[i, j], 2)) * error
+        neighbors = topological_neighbors(L, i)
+        for j in neighbors:
+            # gradient = gain * (||actual||^2 - ||desired||^2) * (pos_j - pos_i)
+            dist_sq = np.linalg.norm(x[:2, i] - x[:2, j])**2
+            dxi[:, i] += formation_control_gain * (dist_sq - weights[i, j]**2) * (x[:2, j] - x[:2, i])
 
-    #Keep single integrator control vectors under specified magnitude
-    # Threshold control inputs
-    norms = np.linalg.norm(dxi, 2, 0)
-    idxs_to_normalize = (norms > magnitude_limit)
-    dxi[:, idxs_to_normalize] *= magnitude_limit/norms[idxs_to_normalize]
+    # ---------------------------------------------------------
+    # Velocity thresholding (3/4 of max linear velocity)
+    # ---------------------------------------------------------
+    norms = np.linalg.norm(dxi, axis=0)
+    threshold = 0.75 * r.MAX_LINEAR_VELOCITY
+    to_thresh = norms > threshold
+    
+    if np.any(to_thresh):
+        dxi[:, to_thresh] *= threshold / norms[to_thresh]
 
-    # Make sure that the robots don't collide
+    # ---------------------------------------------------------
+    # Safety and Dynamics conversion
+    # ---------------------------------------------------------
     dxi = si_barrier_cert(dxi, x[:2, :])
-
-    # Transform the single-integrator dynamcis to unicycle dynamics
     dxu = si_to_uni_dyn(dxi, x)
 
-    # Set the velocities of the robots
     r.set_velocities(np.arange(N), dxu)
-    # Iterate the simulation
     r.step()
 
-#Call at end of script to print debug information and for your script to run on the Robotarium server properly
-r.call_at_scripts_end()
+# Final debug report
+r.debug()

@@ -1,65 +1,66 @@
-import rps.robotarium as robotarium
-from rps.utilities.graph import *
-from rps.utilities.transformations import *
-from rps.utilities.barrier_certificates import *
-from rps.utilities.misc import *
-from rps.utilities.controllers import *
-
 import numpy as np
+import rps.robotarium as robotarium
+from rps.utilities.graph import cycleGL, topological_neighbors
+from rps.utilities.transformations import create_si_to_uni_mapping, create_si_to_uni_dynamics
+from rps.utilities.barrier_certificates import create_uni_barrier_certificate_with_boundary
 
-# Instantiate Robotarium object
+# =========================================================
+# SIMULATION PARAMETERS
+# =========================================================
 N = 12
+iterations = 2000
+
+# =========================================================
+# ROBOTARIUM INITIALIZATION
+# =========================================================
 r = robotarium.Robotarium(number_of_robots=N, show_figure=True, sim_in_real_time=True)
 
-# How many iterations do we want (about N*0.033 seconds)
-iterations = 1000
+# =========================================================
+# GRAPH TOPOLOGY & SAFETY SETUP
+# =========================================================
+L = cycleGL(N)
 
-#Maximum linear speed of robot specified by motors
-magnitude_limit = 0.15
+# Use more robust dynamics mapping for consensus
+_, uni_to_si_states = create_si_to_uni_mapping()
+si_to_uni_dyn = create_si_to_uni_dynamics()
 
-# We're working in single-integrator dynamics, and we don't want the robots
-# to collide or drive off the testbed.  Thus, we're going to use barrier certificates
-si_barrier_cert = create_single_integrator_barrier_certificate_with_boundary()
+# Safety barrier certificate (applied in unicycle space)
+uni_barrier_cert = create_uni_barrier_certificate_with_boundary()
 
-# Create SI to UNI dynamics tranformation
-si_to_uni_dyn, uni_to_si_states = create_si_to_uni_mapping()
-
-# Generated a connected graph Laplacian (for a cylce graph).
-L = cycle_GL(N)
-
+# =========================================================
+# MAIN SIMULATION LOOP
+# =========================================================
 for k in range(iterations):
-
-    # Get the poses of the robots and convert to single-integrator poses
     x = r.get_poses()
-    x_si = uni_to_si_states(x)
+    xi = uni_to_si_states(x)
 
-    # Initialize the single-integrator control inputs
-    si_velocities = np.zeros((2, N))
+    dxi = np.zeros((2, N))
 
-    # For each robot...
+    # Compute consensus control
     for i in range(N):
-        # Get the neighbors of robot 'i' (encoded in the graph Laplacian)
-        j = topological_neighbors(L, i)
-        # Compute the consensus algorithm
-        si_velocities[:, i] = np.sum(x_si[:, j] - x_si[:, i, None], 1)
+        neighbors = topological_neighbors(L, i)
+        for j in neighbors:
+            dxi[:, i] += (xi[:, j] - xi[:, i])
 
+    # ---------------------------------------------------------
+    # Velocity Thresholding
+    # Cap speeds at 3/4 of max linear velocity (0.2 * 0.75 = 0.15 m/s)
+    # ---------------------------------------------------------
+    norms = np.linalg.norm(dxi, axis=0)
+    threshold = 0.75 * r.MAX_LINEAR_VELOCITY
+    to_thresh = norms > threshold
+    
+    # Avoid division by zero with small norms
+    if np.any(to_thresh):
+        dxi[:, to_thresh] *= threshold / norms[to_thresh]
 
-    #Keep single integrator control vectors under specified magnitude
-    # Threshold control inputs
-    norms = np.linalg.norm(si_velocities, 2, 0)
-    idxs_to_normalize = (norms > magnitude_limit)
-    si_velocities[:, idxs_to_normalize] *= magnitude_limit/norms[idxs_to_normalize]
+    # ---------------------------------------------------------
+    # Mapping and Safety
+    # ---------------------------------------------------------
+    dxu = si_to_uni_dyn(dxi, x)
+    dxu = uni_barrier_cert(dxu, x)
 
-    # Use the barrier certificate to avoid collisions
-    si_velocities = si_barrier_cert(si_velocities, x_si)
-
-    # Transform single integrator to unicycle
-    dxu = si_to_uni_dyn(si_velocities, x)
-
-    # Set the velocities of agents 1,...,N
     r.set_velocities(np.arange(N), dxu)
-    # Iterate the simulation
     r.step()
 
-#Call at end of script to print debug information and for your script to run on the Robotarium server properly
-r.call_at_scripts_end()
+r.debug()

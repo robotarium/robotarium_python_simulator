@@ -1,154 +1,232 @@
-'''
-TODO: UPDATE DESCRIPTION
+# LEADER_FOLLOWER_WITH_PLOTTING
+# One leader robot travels between four waypoints while N-1 follower robots
+# maintain a formation relative to it using a graph Laplacian-based law.
+#
+# Visualization includes:
+#   - Graph edges (blue for follower-follower, red for leader-follower)
+#   - Robot identification labels
+#   - Leader waypoint goal markers
+#
+# Sean Wilson / Python port
+# 07/2019
 
- Sean Wilson
- 10/2019
-'''
-
-#Import Robotarium Utilities
-import rps.robotarium as robotarium
-from rps.utilities.transformations import *
-from rps.utilities.graph import *
-from rps.utilities.barrier_certificates import *
-from rps.utilities.misc import *
-from rps.utilities.controllers import *
-
-#Other Imports
 import numpy as np
 
-# Experiment Constants
-iterations = 5000 #Run the simulation/experiment for 5000 steps (5000*0.033 ~= 2min 45sec)
-N=4 #Number of robots to use, this must stay 4 unless the Laplacian is changed.
+import rps.robotarium as robotarium
+from rps.utilities.transformations import create_si_to_uni_dynamics
+from rps.utilities.graph import completeGL, topological_neighbors
+from rps.utilities.barrier_certificates import create_uni_barrier_certificate_with_boundary
+from rps.utilities.controllers import create_si_position_controller
+from rps.utilities.misc import generate_random_poses
 
-waypoints = np.array([[-1, -1, 1, 1],[0.8, -0.8, -0.8, 0.8]]) #Waypoints the leader moves to.
-close_enough = 0.03; #How close the leader must get to the waypoint to move to the next one.
+# =========================================================
+# SIMULATION PARAMETERS
+# =========================================================
+N          = 4       # 1 leader + N-1 followers
+iterations = 5000
 
-# Create the desired Laplacian
-followers = -completeGL(N-1)
-L = np.zeros((N,N))
-L[1:N,1:N] = followers
-L[1,1] = L[1,1] + 1
-L[1,0] = -1
+# =========================================================
+# ROBOTARIUM INITIALIZATION
+# =========================================================
+initial_positions = generate_random_poses(N, width=1.6, height=1.0, spacing=0.5)
+r = robotarium.Robotarium(number_of_robots=N, show_figure=True,
+                           initial_conditions=initial_positions)
 
-# Find connections
-[rows,cols] = np.where(L==1)
+# =========================================================
+# GRAPH LAPLACIAN AND FORMATION SETUP
+# =========================================================
+# Followers form a complete graph among themselves; robot 2 (index 1) is
+# additionally connected to the leader (robot 1, index 0)
+followers = -completeGL(N - 1)
+L = np.zeros((N, N))
+L[1:N, 1:N] = followers
+L[1, 1] += 1
+L[1, 0]  = -1
 
-# For computational/memory reasons, initialize the velocity vector
-dxi = np.zeros((2,N))
+formation_control_gain = 5      # matches MATLAB
+desired_distance        = 0.3   # matches MATLAB
 
-#Initialize leader state
-state = 0
+# =========================================================
+# CONTROLLER AND SAFETY SETUP
+# =========================================================
+si_to_uni_dyn    = create_si_to_uni_dynamics(linear_velocity_gain=0.8)
+uni_barrier_cert = create_uni_barrier_certificate_with_boundary()
+leader_controller = create_si_position_controller(
+    x_velocity_gain=0.8, y_velocity_gain=0.8, velocity_magnitude_limit=0.08)
 
-#Limit maximum linear speed of any robot
-magnitude_limit = 0.15
+# =========================================================
+# WAYPOINT INITIALIZATION
+# =========================================================
+waypoints   = np.array([[-1, -1, 1, 1],
+                         [0.8, -0.8, -0.8, 0.8]])   # (2, 4)
+close_enough = 0.03
+state        = 0
+dxi          = np.zeros((2, N))
 
-# Create gains for our formation control algorithm
-formation_control_gain = 10
-desired_distance = 0.3
+# =========================================================
+# HELPER FUNCTIONS
+# =========================================================
+def determine_marker_size(robotarium_instance, marker_size_meters):
+    """Marker size in points matching a physical width in metres."""
+    fig  = robotarium_instance._fig
+    ax   = robotarium_instance._axes_handle
+    fig.canvas.draw()
+    bbox = ax.get_window_extent()
+    arena_w = robotarium_instance.BOUNDARIES[1] - robotarium_instance.BOUNDARIES[0]
+    return (marker_size_meters / arena_w) * bbox.width
 
-# Initial Conditions to Avoid Barrier Use in the Beginning.
-initial_conditions = np.array([[0, 0.5, 0.3, -0.1],[0.5, 0.5, 0.2, 0],[0, 0, 0, 0]])
+def determine_font_size(robotarium_instance, font_height_meters):
+    """Font size in points matching a physical height in metres."""
+    fig  = robotarium_instance._fig
+    fig.canvas.draw()
+    fig_h_px = fig.get_size_inches()[1] * fig.dpi
+    arena_h  = robotarium_instance.BOUNDARIES[3] - robotarium_instance.BOUNDARIES[2]
+    return fig_h_px * (font_height_meters / arena_h)
 
-# Instantiate the Robotarium object with these parameters
-r = robotarium.Robotarium(number_of_robots=N, show_figure=True, initial_conditions=initial_conditions, sim_in_real_time=True)
+# =========================================================
+# PLOT INITIALIZATION
+# =========================================================
+ax = r._axes_handle
 
-# Grab Robotarium tools to do simgle-integrator to unicycle conversions and collision avoidance
-# Single-integrator -> unicycle dynamics mapping
-_,uni_to_si_states = create_si_to_uni_mapping()
-si_to_uni_dyn = create_si_to_uni_dynamics(angular_velocity_limit=np.pi/2)
-# Single-integrator barrier certificates
-si_barrier_cert = create_single_integrator_barrier_certificate_with_boundary()
-# Single-integrator position controller
-leader_controller = create_si_position_controller(velocity_magnitude_limit=0.15)
+# One colour per robot
+CM = ['k', 'b', 'r', 'g']
 
-# Plotting Parameters
-CM = np.random.rand(N,3) # Random Colors
-marker_size_goal = determine_marker_size(r,0.2)
-font_size_m = 0.1
-font_size = determine_font_size(r,font_size_m)
-line_width = 5
+marker_size_goal = determine_marker_size(r, 0.20)
+font_size        = determine_font_size(r, 0.05)
+line_width       = 5
 
-# Create goal text and markers
+# Waypoint goal markers and labels
+g            = []
+goal_labels  = []
+for i in range(waypoints.shape[1]):
+    gm, = ax.plot(waypoints[0, i], waypoints[1, i], 's',
+                  markersize=marker_size_goal, 
+                  markerfacecolor='none',
+                  markeredgecolor=CM[i],
+                  markeredgewidth=line_width,
+                  zorder=2)
+    g.append(gm)
+    gl = ax.text(waypoints[0, i] - 0.05, waypoints[1, i],
+                 f'G{i+1}', fontsize=font_size, fontweight='bold',
+                 color='k', zorder=2)
+    goal_labels.append(gl)
 
-#Text with goal identification
-goal_caption = ['G{0}'.format(ii) for ii in range(waypoints.shape[1])]
-#Plot text for caption
-waypoint_text = [r.axes.text(waypoints[0,ii], waypoints[1,ii], goal_caption[ii], fontsize=font_size, color='k',fontweight='bold',horizontalalignment='center',verticalalignment='center',zorder=-2)
-for ii in range(waypoints.shape[1])]
-g = [r.axes.scatter(waypoints[0,ii], waypoints[1,ii], s=marker_size_goal, marker='s', facecolors='none',edgecolors=CM[ii,:],linewidth=line_width,zorder=-2)
-for ii in range(waypoints.shape[1])]
+# Get initial poses before drawing edges
+x = r.get_poses()
 
-# Plot Graph Connections
-x = r.get_poses() # Need robot positions to do this.
-linked_follower_index = np.empty((2,3))
-follower_text = np.empty((3,0))
-for jj in range(1,int(len(rows)/2)+1):
-	linked_follower_index[:,[jj-1]] = np.array([[rows[jj]],[cols[jj]]])
-	follower_text = np.append(follower_text,'{0}'.format(jj))
+# Follower-follower edges (blue): L == 1 gives the directed edge source
+rows, cols = np.where(L == 1)
+# Each undirected edge appears once as a directed entry with value 1
+lf = []
+for k in range(len(rows)):
+    line, = ax.plot([x[0, rows[k]], x[0, cols[k]]],
+                    [x[1, rows[k]], x[1, cols[k]]],
+                    color='b', linewidth=line_width, zorder=1)
+    lf.append(line)
 
-line_follower = [r.axes.plot([x[0,rows[kk]], x[0,cols[kk]]],[x[1,rows[kk]], x[1,cols[kk]]],linewidth=line_width,color='b',zorder=-1)
- for kk in range(1,N)]
-line_leader = r.axes.plot([x[0,0],x[0,1]],[x[1,0],x[1,1]],linewidth=line_width,color='r',zorder = -1)
-follower_labels = [r.axes.text(x[0,kk],x[1,kk]+0.15,follower_text[kk-1],fontsize=font_size, color='b',fontweight='bold',horizontalalignment='center',verticalalignment='center',zorder=0)
-for kk in range(1,N)]
-leader_label = r.axes.text(x[0,0],x[1,0]+0.15,"Leader",fontsize=font_size, color='r',fontweight='bold',horizontalalignment='center',verticalalignment='center',zorder=0)
+# Leader-follower edge (red): always between robot 0 and robot 1
+ll, = ax.plot([x[0, 0], x[0, 1]], [x[1, 0], x[1, 1]],
+              color='r', linewidth=line_width, zorder=1)
+
+# Follower labels (off-screen initially)
+follower_labels = []
+for j in range(N - 1):
+    fl = ax.text(500, 500, f'Follower Robot {j+1}',
+                 fontsize=font_size, fontweight='bold', color='k', zorder=5)
+    follower_labels.append(fl)
+
+# Leader label (off-screen initially)
+leader_label = ax.text(500, 500, 'Leader Robot',
+                       fontsize=font_size, fontweight='bold', color='r', zorder=5)
 
 r.step()
+
+# =========================================================
+# FIGURE RESIZE EVENT LISTENER
+# =========================================================
+def on_resize(event):
+    """Dynamically scales markers and text when the figure window is resized."""
+    new_goal_size = determine_marker_size(r, 0.20)
+    font_size     = determine_font_size(r, 0.05)
+    
+    # Scale goal markers and their labels
+    for gm in g:
+        gm.set_markersize(new_goal_size)
+    for gl in goal_labels:
+        gl.set_fontsize(font_size)
+        
+    # Scale robot labels
+    leader_label.set_fontsize(font_size)
+    for fl in follower_labels:
+        fl.set_fontsize(font_size)
+        
+    ax.figure.canvas.draw_idle()
+
+ax.figure.canvas.mpl_connect('resize_event', on_resize)
+
+# =========================================================
+# MAIN SIMULATION LOOP
+# =========================================================
 for t in range(iterations):
 
-	# Get the most recent pose information from the Robotarium. The time delay is
-	# approximately 0.033s
-	x = r.get_poses()
-	xi = uni_to_si_states(x)
+    x = r.get_poses()
 
-	# Update Plot Handles
-	for q in range(N-1):
-		follower_labels[q].set_position([xi[0,q+1],xi[1,q+1]+0.15])
-		follower_labels[q].set_fontsize(determine_font_size(r,font_size_m))
-		line_follower[q][0].set_data([x[0,rows[q+1]], x[0,cols[q+1]]],[x[1,rows[q+1]], x[1,cols[q+1]]])
-	leader_label.set_position([xi[0,0],xi[1,0]+0.15])
-	leader_label.set_fontsize(determine_font_size(r,font_size_m))
-	line_leader[0].set_data([x[0,0],x[0,1]],[x[1,0],x[1,1]])
+    # ---------------------------------------------------------
+    # Formation control for followers
+    # ---------------------------------------------------------
+    for i in range(1, N):
+        dxi[:, i] = 0.0
+        for j in topological_neighbors(L, i):
+            dxi[:, i] += (
+                formation_control_gain
+                * (np.linalg.norm(x[:2, j] - x[:2, i])**2 - desired_distance**2)
+                * (x[:2, j] - x[:2, i])
+            )
 
-	# This updates the marker sizes if the figure window size is changed. 
-    # This should be removed when submitting to the Robotarium.
-	for q in range(waypoints.shape[1]):
-		waypoint_text[q].set_fontsize(determine_font_size(r,font_size_m))
-		g[q].set_sizes([determine_marker_size(r,0.2)])
+    # ---------------------------------------------------------
+    # Leader waypoint tracking
+    # ---------------------------------------------------------
+    waypoint = waypoints[:, state].reshape(2, 1)
+    dxi[:, 0] = leader_controller(x[:2, 0:1], waypoint).flatten()
+    if np.linalg.norm(x[:2, 0] - waypoints[:, state]) < close_enough:
+        state = (state + 1) % waypoints.shape[1]
 
-	#Algorithm
+    # ---------------------------------------------------------
+    # Velocity thresholding for followers (not leader)
+    # ---------------------------------------------------------
+    threshold = 0.75 * r.MAX_LINEAR_VELOCITY
+    for k in range(1, N):
+        spd = np.linalg.norm(dxi[:, k])
+        if spd > threshold:
+            dxi[:, k] *= threshold / spd
 
-	#Followers
-	for i in range(1,N):
-		# Zero velocities and get the topological neighbors of agent i
-		dxi[:,[i]]=np.zeros((2,1))
-		neighbors = topological_neighbors(L,i)
+    # ---------------------------------------------------------
+    # Convert to unicycle and apply barrier certificate
+    # ---------------------------------------------------------
+    dxu = si_to_uni_dyn(dxi, x)
+    dxu = uni_barrier_cert(dxu, x)
+    r.set_velocities(np.arange(N), dxu)
 
-		for j in neighbors:
-			dxi[:,[i]] += formation_control_gain*(np.power(np.linalg.norm(x[:2,[j]]-x[:2,[i]]), 2)-np.power(desired_distance, 2))*(x[:2,[j]]-x[:2,[i]])
+    # ---------------------------------------------------------
+    # Update plot handles
+    # ---------------------------------------------------------
+    # Follower labels track their robots
+    for q in range(N - 1):
+        follower_labels[q].set_position((x[0, q + 1] - 0.15, x[1, q + 1] + 0.15))
 
-	#Leader
-	waypoint = waypoints[:,state].reshape((2,1))
+    # Follower-follower graph edges
+    for m in range(len(rows)):
+        lf[m].set_xdata([x[0, rows[m]], x[0, cols[m]]])
+        lf[m].set_ydata([x[1, rows[m]], x[1, cols[m]]])
 
-	dxi[:,[0]] = leader_controller(x[:2,[0]], waypoint)
-	if np.linalg.norm(x[:2,[0]] - waypoint) < close_enough:
-		state = (state + 1)%4
+    # Leader label and leader-follower edge
+    leader_label.set_position((x[0, 0] - 0.15, x[1, 0] + 0.15))
+    ll.set_xdata([x[0, 0], x[0, 1]])
+    ll.set_ydata([x[1, 0], x[1, 1]])
 
-	#Keep single integrator control vectors under specified magnitude
-	# Threshold control inputs
-	norms = np.linalg.norm(dxi, 2, 0)
-	idxs_to_normalize = (norms > magnitude_limit)
-	dxi[:, idxs_to_normalize] *= magnitude_limit/norms[idxs_to_normalize]
+    r.step()
 
-	#Use barriers and convert single-integrator to unicycle commands
-	dxi = si_barrier_cert(dxi, x[:2,:])
-	dxu = si_to_uni_dyn(dxi,x)
-
-	# Set the velocities of agents 1,...,N to dxu
-	r.set_velocities(np.arange(N), dxu)
-
-	# Iterate the simulation
-	r.step()
-
-#Call at end of script to print debug information and for your script to run on the Robotarium server properly
-r.call_at_scripts_end()
+# =========================================================
+# DEBUG REPORT
+# =========================================================
+r.debug()

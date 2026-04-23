@@ -1,195 +1,167 @@
 import numpy as np
 
-def cycle_GL(N):
-    """ Generates a graph Laplacian for a cycle graph
-
-    N: int (number of agents)
-
-    -> NxN numpy array (representing the graph Laplacian)
+def completeGL(n):
     """
-    #Check user input types
-    assert isinstance(N, int), "In the cycle_GL function, the number of nodes (N) must be an integer. Recieved type %r." % type(N).__name__
-    #Check user input ranges/sizes
-    assert N > 0, "In the cycle_GL function, number of nodes (N) must be positive. Recieved %r." % N
+    Return the graph Laplacian of a complete graph on n nodes.
 
-    ones = np.ones(N-1)
-    L = 2*np.identity(N) - np.diag(ones, 1) - np.diag(ones, -1)
-    L[N-1, 0] = -1
-    L[0, N-1] = -1
-
+    In a complete graph every node is connected to every other node, so
+    each node has degree n-1.  The Laplacian is L = n*I - 11^T.
+    """
+    assert isinstance(n, int) and n > 0, "n must be a positive integer."
+    
+    L = n * np.eye(n) - np.ones((n, n))
     return L
 
-def lineGL(N):
-    """ Generates a graph Laplacian for a line graph
 
-    N: int (number of agents)
-
-    -> NxN numpy array (representing the graph Laplacian)
+def cycleGL(n):
     """
-    #Check user input types
-    assert isinstance(N, int), "In the lineGL function, the number of nodes (N) must be an integer. Recieved type %r." % type(N).__name__
-    #Check user input ranges/sizes
-    assert N > 0, "In the lineGL function, number of nodes (N) must be positive. Recieved %r." % N
-
-    ones = np.ones(N-1)
-    L = 2*np.identity(N) - np.diag(ones, 1) - np.diag(ones, -1)
-    L[0,0] = 1
-    L[N-1,N-1] = 1
-
+    Return the graph Laplacian of a cycle graph on n nodes.
+    
+    In a cycle graph every node has exactly two neighbours, so every diagonal 
+    entry is 2. The two wrap-around edges between nodes 0 and n-1 are added
+    explicitly.
+    """
+    assert isinstance(n, int) and n >= 3, "n must be an integer >= 3."
+    
+    L = 2 * np.eye(n) - np.diag(np.ones(n-1), 1) - np.diag(np.ones(n-1), -1)
+    
+    # Close the ring
+    L[0, n-1] = -1
+    L[n-1, 0] = -1
     return L
 
-def completeGL(N):
-    """ Generates a graph Laplacian for a complete graph
 
-    N: int (number of agents)
-
-    -> NxN numpy array (representing the graph Laplacian)
+def lineGL(n):
     """
-
-    #Check user input types
-    assert isinstance(N, int), "In the completeGL function, the number of nodes (N) must be an integer. Recieved type %r." % type(N).__name__
-    #Check user input ranges/sizes
-    assert N > 0, "In the completeGL function, number of nodes (N) must be positive. Recieved %r." % N
-
-    L = N*np.identity(N)-np.ones((N,N))
-
+    Return the graph Laplacian of a path (line) graph on n nodes.
+    
+    In a path graph interior nodes have degree 2 and the two endpoint
+    nodes have degree 1.
+    """
+    assert isinstance(n, int) and n >= 2, "n must be an integer >= 2."
+    
+    L = 2 * np.eye(n) - np.diag(np.ones(n-1), 1) - np.diag(np.ones(n-1), -1)
+    
+    # Correct the two endpoint degrees from 2 to 1
+    L[0, 0] = 1
+    L[n-1, n-1] = 1
     return L
+
 
 def random_connectedGL(v, e):
-    """ Generates a Laplacian for a random, connected graph with v verticies 
-    and (v-1) + e edges.
-
-    v: int (number of nodes)
-    e: number of additional edges
-
-    -> vxv numpy array (representing the graph Laplacian)
     """
-
-    #Check user input types
-    assert isinstance(v, int), "In the random_connectedGL function, the number of verticies (v) must be an integer. Recieved type %r." % type(v).__name__
-    assert isinstance(e, int), "In the random_connectedGL function, the number of additional edges (e) must be an integer. Recieved type %r." % type(e).__name__
-    #Check user input ranges/sizes
-    assert v > 0, "In the random_connectedGL function, number of verticies (v) must be positive. Recieved %r." % v
-    assert e >= 0, "In the random_connectedGL function, number of additional edges (e) must be greater than or equal to zero. Recieved %r." % e
-
-
-    L = np.zeros((v,v))
-
+    Return the graph Laplacian of a random connected graph.
+    
+    Generates a guaranteed-connected graph on v nodes using a random
+    spanning tree (Prüfer-style), then adds up to e extra edges chosen 
+    uniformly at random from the remaining candidate pairs.
+    """
+    assert isinstance(v, int) and v > 0, "v must be a positive integer."
+    assert isinstance(e, int) and e >= 0, "e must be a non-negative integer."
+    
+    L = np.zeros((v, v))
+    
+    # ── Build a random spanning tree ──
+    # Add each node i (1..v-1) with an edge to a uniformly random predecessor j < i.
     for i in range(1, v):
-        edge = np.random.randint(i,size=(1,1))
-        #Update adjancency relations
-        L[i,edge] = -1
-        L[edge,i] = -1
-
-        #Update node degrees
-        L[i,i] += 1
-        L[edge,edge] = L[edge,edge]+1
-    # Because all nodes have at least 1 degree, chosse from only upper diagonal portion
-    iut = np.triu_indices(v)
-    iul = np.tril_indices(v)
-    Ltemp = np.copy(L)
-    Ltemp[iul] = 1
-    potEdges = np.where(np.logical_xor(Ltemp, 1)==True)
-    numEdges = min(e, len(potEdges[0]))
-
-    if numEdges <= 0:
-        return L
-
-    #Indicies of randomly chosen extra edges
-    edgeIndicies = np.random.permutation(len(potEdges[0]))[:numEdges]
-    sz =L.shape
-
-    for index in edgeIndicies:
-
-        #Update adjacency relation
-        L[potEdges[0][index],potEdges[1][index]] = -1
-        L[potEdges[1][index],potEdges[0][index]] = -1
-
-        #Update Degree Relation
-        L[potEdges[0][index],potEdges[0][index]] += 1
-        L[potEdges[1][index],potEdges[1][index]] += 1
-
+        j = np.random.randint(0, i)
+        L[i, j] = -1
+        L[j, i] = -1
+        L[i, i] += 1
+        L[j, j] += 1
+        
+    # ── Add extra random edges ──
+    # Candidate pairs are strictly upper-triangular entries that are not yet edges
+    candidates = np.argwhere(np.triu(L == 0, 1))
+    
+    numEdges = min(e, len(candidates))
+    if numEdges > 0:
+        np.random.shuffle(candidates)
+        chosen = candidates[:numEdges]
+        
+        for idx in range(numEdges):
+            i, j = chosen[idx]
+            L[i, j] = -1
+            L[j, i] = -1
+            L[i, i] += 1
+            L[j, j] += 1
+            
     return L
+
 
 def randomGL(v, e):
-    """ Generates a Laplacian for a random graph with v verticies 
-    and e edges.
-
-    v: int (number of nodes)
-    e: number of additional edges
-
-    -> vxv numpy array (representing the graph Laplacian)
     """
-
-    L = np.tril(np.ones((v,v)))
-
-    #This works because you can't select diagonals
-    potEdges = np.where(L==0)
+    Return the graph Laplacian of a random graph on v nodes with at most e edges.
     
-    L = L-L
-
-    numEdges = min(e, len(potEdges[0]))
-    #Indicies of randomly chosen extra edges
-    edgeIndicies = np.random.permutation(len(potEdges[0]))[:numEdges]
-
-    for index in edgeIndicies:
-
-        #Update adjacency relation
-        L[potEdges[0][index],potEdges[1][index]] = -1
-        L[potEdges[1][index],potEdges[0][index]] = -1
-
-        #Update Degree Relation
-        L[potEdges[0][index],potEdges[0][index]] += 1
-        L[potEdges[1][index],potEdges[1][index]] += 1
-
+    Selects up to e edges uniformly at random from all possible undirected
+    pairs. The resulting graph may be disconnected.
+    """
+    assert isinstance(v, int) and v > 0, "v must be a positive integer."
+    assert isinstance(e, int) and e >= 0, "e must be a non-negative integer."
+    
+    L = np.zeros((v, v))
+    
+    # Enumerate all unique undirected pairs (strictly upper triangle)
+    candidates = np.argwhere(np.triu(np.ones((v, v)), 1))
+    
+    numEdges = min(e, len(candidates))
+    if numEdges > 0:
+        np.random.shuffle(candidates)
+        chosen = candidates[:numEdges]
+        
+        for idx in range(numEdges):
+            i, j = chosen[idx]
+            L[i, j] = -1
+            L[j, i] = -1
+            L[i, i] += 1
+            L[j, j] += 1
+            
     return L
+
+
+def delta_disk_neighbors(poses, agent, delta):
+    """
+    Return the indices of all agents within a given distance of a specified agent.
+    
+    Inputs
+    ------
+    poses : 2xN (or larger) matrix of agent positions
+    agent : index of the query agent (0-based integer)
+    delta : neighbourhood radius (m)
+    """
+    N = poses.shape[1]
+    assert 0 <= agent < N, f"agent ({agent}) must be between 0 and {N-1}."
+    
+    # Build index list of all agents except the query agent
+    others = np.concatenate((np.arange(agent), np.arange(agent + 1, N)))
+    
+    if len(others) == 0:
+        return np.array([], dtype=int)
+        
+    # Keep only those within the delta-disk
+    dists = np.linalg.norm(poses[:2, others] - poses[:2, agent:agent+1], axis=0)
+    in_range = dists <= delta
+    
+    return others[in_range]
 
 
 def topological_neighbors(L, agent):
-    """ Returns the neighbors of a particular agent using the graph Laplacian
-
-    L: NxN numpy array (representing the graph Laplacian)
-    agent: int (agent: 0 - N-1)
-
-    -> 1xM numpy array (with M neighbors)
     """
-    #Check user input types
-    assert isinstance(L, np.ndarray), "In the topological_neighbors function, the graph Laplacian (L) must be a numpy ndarray. Recieved type %r." % type(L).__name__
-    assert isinstance(agent, int), "In the topological_neighbors function, the agent number (agent) must be an integer. Recieved type %r." % type(agent).__name__
+    Return the indices of an agent's graph neighbours.
     
-    #Check user input ranges/sizes
-    assert agent >= 0, "In the topological_neighbors function, the agent number (agent) must be greater than or equal to zero. Recieved %r." % agent
-    assert agent <= L.shape[0], "In the topological_neighbors function, the agent number (agent) must be within the dimension of the provided Laplacian (L). Recieved agent number %r and Laplactian size %r by %r." % (agent, L.shape[0], L.shape[1])
-
-    row = L[agent, :]
-    row[agent]=0
-    # Since L = D - A
-    return np.where(row != 0)[0]
-
-def delta_disk_neighbors(poses, agent, delta):
-    ''' Returns the agents within the 2-norm of the supplied agent (not including the agent itself)
-    poses: 3xN numpy array (representing the unicycle statese of the robots)
-    agent: int (agent whose neighbors within a radius will be returned)
-    delta: float (radius of delta disk considered)
-
-    -> 1xM numpy array (with M neighbors)
-
-    '''
-    #Check user input types
-    assert isinstance(poses, np.ndarray), "In the delta_disk_neighbors function, the robot poses (poses) must be a numpy ndarray. Recieved type %r." % type(poses).__name__
-    assert isinstance(agent, int), "In the delta_disk_neighbors function, the agent number (agent) must be an integer. Recieved type %r." % type(agent).__name__
-    assert isinstance(delta, (int,float)), "In the delta_disk_neighbors function, the agent number (agent) must be an integer. Recieved type %r." % type(agent).__name__
-
-    #Check user input ranges/sizes
-    assert agent >= 0, "In the delta_disk_neighbors function, the agent number (agent) must be greater than or equal to zero. Recieved %r." % agent
-    assert delta >=0, "In the delta_disk_neighbors function, the sensing/communication radius (delta) must be greater than or equal to zero. Recieved %r." % delta
-    assert agent <= poses.shape[1], "In the delta_disk_neighbors function, the agent number (agent) must be within the dimension of the provided poses. Recieved agent number %r and poses for %r agents." % (agent, poses.shape[1])
-
-
-
-    N = poses.shape[1]
-    agents = np.arange(N)
-
-    within_distance = [np.linalg.norm(poses[:2,x]-poses[:2,agent])<=delta for x in agents]
-    within_distance[agent] = False
-    return agents[within_distance]
+    Reads connectivity directly from the graph Laplacian.
+    
+    Inputs
+    ------
+    L     : NxN graph Laplacian
+    agent : index of the query agent (0-based integer)
+    """
+    N = L.shape[0]
+    assert 0 <= agent < N, f"agent ({agent}) must be between 0 and {N-1}."
+    
+    # Extract the agent's row and zero out the diagonal before searching
+    row = np.copy(L[agent, :])
+    row[agent] = 0
+    
+    neighbors = np.where(row != 0)[0]
+    return neighbors

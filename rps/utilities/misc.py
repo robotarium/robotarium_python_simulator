@@ -1,232 +1,184 @@
 import numpy as np
 from numpy.typing import NDArray
-import matplotlib.pyplot as plt
+from datetime import datetime
+import random
+from rps.robotarium_abc import ARobotarium
+
+def determine_font_size(robotarium_instance: ARobotarium, font_height_meters: float) -> float:
+    """Font size in points matching a physical height in metres."""
+    fig   = robotarium_instance._fig
+    fig.canvas.draw()
+    fig_h_px = fig.get_size_inches()[1] * fig.dpi
+    arena_h  = robotarium_instance.BOUNDARIES[3] - robotarium_instance.BOUNDARIES[2]
+    return fig_h_px * (font_height_meters / arena_h)
 
 
-def generate_initial_conditions(N, spacing=0.3, width=3, height=1.8):
+def generate_initial_poses(
+    N: int,
+    width: float = 3.0,
+    height: float = 1.0
+) -> NDArray[np.floating]:
+    """Generate N initial poses for the robots starting from where they come off of the chargers"""
+    xs = np.linspace(-width/2, width/2, 11, endpoint=True)
+    poses = [[x, y, np.pi/2 if y < 0 else -np.pi/2] for x in xs for y in [-height/2, height/2]]
+    return np.array(random.sample(poses, N)).T
+
+
+def generate_random_poses(N, spacing=0.5, width=3.0, height=1.8):
     """
-    Generate N random 2D poses (x, y, theta) within a rectangular area,
-    with a minimum spacing between any two points.
-
-    Parameters:
-        N (int): Number of poses to generate.
-        spacing (float): Minimum distance between poses (default: 0.3).
-        width (float): Width of the rectangle (default: 3.0).
-        height (float): Height of the rectangle (default: 1.8).
-
-    Returns:
-        poses (np.ndarray): 3 x N array of poses [x; y; theta].
+    Generate N random, well-spaced poses inside a rectangle.
+    
+    Returns a 3xN matrix of poses [x; y; theta] whose (x,y) positions are
+    uniformly sampled inside a Width x Height rectangle centred at the origin,
+    subject to a minimum separation distance between every pair of points.
+    Headings theta are drawn uniformly from [-pi, pi).
     """
+    assert isinstance(N, int) and N > 0, "N must be a positive integer."
+    assert spacing > 0, "spacing must be positive."
+    assert width > 0 and height > 0, "width and height must be positive."
 
-    #Check user input types
-    assert isinstance(N, int), "In the function generate_initial_conditions, the number of robots (N) to generate intial conditions for must be an integer. Recieved type %r." % type(N).__name__
-    assert isinstance(spacing, (float,int)), "In the function generate_initial_conditions, the minimum spacing between robots (spacing) must be an integer or float. Recieved type %r." % type(spacing).__name__
-    assert isinstance(width, (float,int)), "In the function generate_initial_conditions, the width of the area to place robots randomly (width) must be an integer or float. Recieved type %r." % type(width).__name__
-    assert isinstance(height, (float,int)), "In the function generate_initial_conditions, the height of the area to place robots randomly (width) must be an integer or float. Recieved type %r." % type(height).__name__
+    # Feasibility check
+    approx_max = int(np.floor((width * height) / (spacing ** 2)))
+    assert N <= approx_max, f"Cannot fit {N} poses with spacing {spacing:.2f} m into a {width:.2f} x {height:.2f} m area. Approximate maximum: {approx_max}."
 
-    #Check user input ranges/sizes
-    assert N > 0, "In the function generate_initial_conditions, the number of robots to generate initial conditions for (N) must be positive. Recieved %r." % N
-    assert spacing > 0, "In the function generate_initial_conditions, the spacing between robots (spacing) must be positive. Recieved %r." % spacing
-    assert width > 0, "In the function generate_initial_conditions, the width of the area to initialize robots randomly (width) must be positive. Recieved %r." % width
-    assert height >0, "In the function generate_initial_conditions, the height of the area to initialize robots randomly (height) must be positive. Recieved %r." % height
+    accepted = []
+    max_attempts = 10000
 
-    # Feasibility check (conservative)
-    approx_max_points = int((width * height) / (spacing ** 2))
-    if N > approx_max_points:
-        raise ValueError(f"In the function generate_initial_conditions, "
-                         f"Cannot fit {N} points with spacing {spacing} "
-                         f"in a {width}m x {height}m area. "
-                         f"Max possible (approx): {approx_max_points}.")
+    # Rejection sampling
+    for _ in range(max_attempts):
+        if len(accepted) == N:
+            break
 
-    points = []
-    max_attempts = 200
-    attempts = 0
+        candidate = np.array([(np.random.rand() - 0.5) * width,
+                              (np.random.rand() - 0.5) * height])
 
-    while len(points) < N and attempts < max_attempts:
-        candidate = [(np.random.rand() - 0.5) * width,
-                     (np.random.rand() - 0.5) * height]
+        if not accepted or np.all(np.linalg.norm(np.array(accepted) - candidate, axis=1) >= spacing):
+            accepted.append(candidate)
 
-        if not points:
-            points.append(candidate)
-        else:
-            dists = np.linalg.norm(np.array(points) - candidate, axis=1)
-            if np.all(dists >= spacing):
-                points.append(candidate)
-
-        attempts += 1
-
-    if len(points) < N:
-        raise RuntimeError("Could not generate enough points with the given spacing. "
-                           "Try reducing N or spacing.")
+    assert len(accepted) == N, f"Could not place {N} poses with spacing {spacing:.2f} m after {max_attempts} attempts. Try reducing N or Spacing."
 
     poses = np.zeros((3, N))
-    poses[0:2, :] = np.array(points).T
-    poses[2, :] = np.random.uniform(-np.pi, np.pi, N)
+    poses[:2, :] = np.array(accepted).T
+    poses[2, :] = np.random.rand(N) * 2 * np.pi - np.pi
 
     return poses
 
-def at_pose(states, poses, position_error=0.05, rotation_error=0.2):
-    """Checks whether robots are "close enough" to poses
-
-    states: 3xN numpy array (of unicycle states)
-    poses: 3xN numpy array (of desired states)
-
-    -> 1xN numpy index array (of agents that are close enough)
+def generate_random_positions(N, spacing=0.5, width=3.0, height=1.8):
     """
-    #Check user input types
-    assert isinstance(states, np.ndarray), "In the at_pose function, the robot current state argument (states) must be a numpy ndarray. Recieved type %r." % type(states).__name__
-    assert isinstance(poses, np.ndarray), "In the at_pose function, the checked pose argument (poses) must be a numpy ndarray. Recieved type %r." % type(poses).__name__
-    assert isinstance(position_error, (float,int)), "In the at_pose function, the allowable position error argument (position_error) must be an integer or float. Recieved type %r." % type(position_error).__name__
-    assert isinstance(rotation_error, (float,int)), "In the at_pose function, the allowable angular error argument (rotation_error) must be an integer or float. Recieved type %r." % type(rotation_error).__name__
-
-    #Check user input ranges/sizes
-    assert states.shape[0] == 3, "In the at_pose function, the dimension of the state of each robot must be 3 ([x;y;theta]). Recieved %r." % states.shape[0]
-    assert poses.shape[0] == 3, "In the at_pose function, the dimension of the checked pose of each robot must be 3 ([x;y;theta]). Recieved %r." % poses.shape[0]
-    assert states.shape == poses.shape, "In the at_pose function, the robot current state and checked pose inputs must be the same size (3xN, where N is the number of robots being checked). Recieved a state array of size %r x %r and checked pose array of size %r x %r." % (states.shape[0], states.shape[1], poses.shape[0], poses.shape[1])
-
-    # Calculate rotation errors with angle wrapping
-    res = states[2, :] - poses[2, :]
-    res = np.abs(np.arctan2(np.sin(res), np.cos(res)))
-
-    # Calculate position errors
-    pes = np.linalg.norm(states[:2, :] - poses[:2, :], 2, 0)
-
-    # Determine which agents are done
-    done = np.nonzero((res <= rotation_error) & (pes <= position_error))
-
-    return done
-
-def at_position(states, points, position_error=0.02):
-    """Checks whether robots are "close enough" to desired position
-
-    states: 3xN numpy array (of unicycle states)
-    points: 2xN numpy array (of desired points)
-
-    -> 1xN numpy index array (of agents that are close enough)
+    Generate N random, well-spaced 2D positions inside a rectangle.
+ 
+    Returns a 2xN matrix of positions [x; y] uniformly sampled inside a
+    Width x Height rectangle centred at the origin, subject to a minimum
+    separation distance between every pair of points.  Unlike
+    generate_random_poses, no heading column is added.
+ 
+    Parameters
+    ----------
+    N       : int   -- number of positions
+    spacing : float -- minimum centre-to-centre distance (m), default 0.5
+    width   : float -- rectangle width  (m), default 3.0
+    height  : float -- rectangle height (m), default 1.8
     """
+    assert isinstance(N, int) and N > 0, "N must be a positive integer."
+    assert spacing > 0, "spacing must be positive."
+    assert width > 0 and height > 0, "width and height must be positive."
+ 
+    approx_max = int(np.floor((width * height) / (spacing ** 2)))
+    assert N <= approx_max, (
+        f"Cannot fit {N} positions with spacing {spacing:.2f} m into a "
+        f"{width:.2f} x {height:.2f} m area. Approximate maximum: {approx_max}."
+    )
+ 
+    accepted = []
+    max_attempts = 10000
+ 
+    for _ in range(max_attempts):
+        if len(accepted) == N:
+            break
+        candidate = np.array([(np.random.rand() - 0.5) * width,
+                               (np.random.rand() - 0.5) * height])
+        if not accepted or np.all(
+            np.linalg.norm(np.array(accepted) - candidate, axis=1) >= spacing
+        ):
+            accepted.append(candidate)
+ 
+    assert len(accepted) == N, (
+        f"Could not place {N} positions with spacing {spacing:.2f} m after "
+        f"{max_attempts} attempts. Try reducing N or spacing."
+    )
+ 
+    positions = np.zeros((2, N))
+    positions[:, :] = np.array(accepted).T
+    return positions
 
-    #Check user input types
-    assert isinstance(states, np.ndarray), "In the at_position function, the robot current state argument (states) must be a numpy ndarray. Recieved type %r." % type(states).__name__
-    assert isinstance(points, np.ndarray), "In the at_position function, the desired pose argument (poses) must be a numpy ndarray. Recieved type %r." % type(points).__name__
-    assert isinstance(position_error, (float,int)), "In the at_position function, the allowable position error argument (position_error) must be an integer or float. Recieved type %r." % type(position_error).__name__
-    
-    #Check user input ranges/sizes
-    assert states.shape[0] == 3, "In the at_position function, the dimension of the state of each robot (states) must be 3. Recieved %r." % states.shape[0]
-    assert points.shape[0] == 2, "In the at_position function, the dimension of the checked position for each robot (points) must be 2. Recieved %r." % points.shape[0]
-    assert states.shape[1] == points.shape[1], "In the at_position function, the number of checked points (points) must match the number of robot states provided (states). Recieved a state array of size %r x %r and desired pose array of size %r x %r." % (states.shape[0], states.shape[1], points.shape[0], points.shape[1])
 
-    # Calculate position errors
-    pes = np.linalg.norm(states[:2, :] - points, 2, 0)
+def create_at_pose(position_error=0.05, rotation_error=0.2):
+    """
+    Creates a function to check whether unicycle robots have reached their 
+    desired poses (position + orientation).
+    """
+    def check_at_pose(states, poses):
+        N = states.shape[1]
+        assert states.shape[0] == 3, f"states must be 3xN. Got {states.shape[0]}x{states.shape[1]}."
+        assert poses.shape[0] == 3, f"poses must be 3xN. Got {poses.shape[0]}x{poses.shape[1]}."
+        assert poses.shape[1] == N, f"states and poses must have the same number of columns ({N} vs {poses.shape[1]})."
 
-    # Determine which agents are done
-    done = np.nonzero((pes <= position_error))
+        pos_converged = np.linalg.norm(states[:2, :] - poses[:2, :], axis=0) <= position_error
+        
+        heading_err = states[2, :] - poses[2, :]
+        rot_converged = np.abs(np.arctan2(np.sin(heading_err), np.cos(heading_err))) <= rotation_error
+        
+        idxs = pos_converged & rot_converged
+        done = bool(np.all(idxs))
+        
+        return done, idxs
 
-    return done
+    return check_at_pose
+
+
+def create_at_position(position_error=0.05):
+    """
+    Creates a function to check whether robots have reached their desired 
+    positions (no heading requirement).
+    """
+    def check_at_position(states, positions):
+        N = states.shape[1]
+        assert states.shape[0] >= 2, f"states must be at least 2xN. Got {states.shape[0]}x{states.shape[1]}."
+        assert positions.shape[0] == 2, f"positions must be 2xN. Got {positions.shape[0]}x{positions.shape[1]}."
+        assert positions.shape[1] == N, f"states and positions must have the same number of columns ({N} vs {positions.shape[1]})."
+
+        idxs = np.linalg.norm(states[:2, :] - positions[:2, :], axis=0) <= position_error
+        done = bool(np.all(idxs))
+        
+        return done, idxs
+
+    return check_at_position
+
 
 def rotation_matrix(theta):
-    """Generates 3x3 rotation matrices for unicycle poses
-    theta: 1xN numpy array (of angles)
-    -> Nx3x3 numpy array (of rotation matrices)
-
-    Notes: Used in distance sensor simulation
     """
+    Returns a 2D rotation matrix for each angle in theta.
+    
+    Returns a 3x3xN array of rotation matrices to match the MATLAB implementation.
+    """
+    theta = np.atleast_1d(theta).flatten()
+    c = np.cos(theta)
+    s = np.sin(theta)
 
-    # Ensure theta is a 1xN numpy array
-    theta_row = np.reshape(theta, (1, theta.size))
-    c = np.cos(theta_row)
-    s = np.sin(theta_row)
-
-    # Pre-allocate 3D array
-    R = np.zeros((3, 3, theta_row.size))
-
+    R = np.zeros((3, 3, len(theta)))
+    
     R[0, 0, :] = c
     R[0, 1, :] = -s
     R[1, 0, :] = s
     R[1, 1, :] = c
-    R[2, 2, :] = 1
-
-    R = np.moveaxis(R, -1, 0)  # Move N to first dimension for batch matrix multiplication
+    R[2, 2, :] = 1.0
 
     return R
 
 
-def determine_marker_size(robotarium_instance, marker_size_meters):
-
-	# Get the x and y dimension of the robotarium figure window in pixels
-	fig_dim_pixels = robotarium_instance.axes.transData.transform(np.array([[robotarium_instance.boundaries[2]],[robotarium_instance.boundaries[3]]]))
-
-	# Determine the ratio of the robot size to the x-axis (the axis are
-	# normalized so you could do this with y and figure height as well).
-	marker_ratio = (marker_size_meters)/(robotarium_instance.boundaries[2])
-
-	# Determine the marker size in points so it fits the window. Note: This is squared
-	# as marker sizes are areas.
-	return (fig_dim_pixels[0,0] * marker_ratio)**2.
-
-
-def determine_font_size(robotarium_instance, font_height_meters):
-
-	# Get the x and y dimension of the robotarium figure window in pixels
-	y1, y2 = robotarium_instance.axes.get_window_extent().get_points()[:,1]
-
-	# Determine the ratio of the robot size to the y-axis.
-	font_ratio = (y2-y1)/(robotarium_instance.boundaries[2])
-
-	# Determine the font size in points so it fits the window.
-	return (font_ratio*font_height_meters)
-
-
-def calculate_global_distance_points(
-    robotarium_instance,
-    poses: NDArray[np.floating],
-    distances: NDArray[np.floating],
-) -> NDArray[np.floating]:
-    """Calculates the global coordinates of points detected by distance sensors.
-
-    Args:
-        poses: A 3xN array of robot poses (x, y, theta).
-        distances: A 7xN array of distance sensor readings for each robot.
-    Returns:
-        A 3x7xN array of global coordinates of detected points for each robot.
+def unique_filename(file_name):
     """
-    N = poses.shape[1]
-    N_sensors = distances.shape[0]
-    distance_sensors_orientation = robotarium_instance.distance_sensors_orientation  # (3, 7)
-
-    # Mask invalid readings (-1 means no detection)
-    valid_distances = distances.astype(float).copy()
-    valid_distances[valid_distances < 0] = np.nan
-
-    # Get rotation matrices for each robot: (N, 3, 3)
-    R = rotation_matrix(poses[2, :])
-
-    # Global sensor positions and orientations: (N, 3, 7)
-    poses_col = poses.T[:, :, None]  # (N, 3, 1)
-    global_sensors = poses_col + np.matmul(R, distance_sensors_orientation)  # (N, 3, 7)
-
-    # Get rotation matrices for each sensor orientation: (N, 3, 3) per sensor
-    # global_sensors[:, 2, :] has shape (N, 7) - the orientation of each sensor
-    R_sensor = rotation_matrix(global_sensors[:, 2, :])  # (N*7, 3, 3)
-
-    # Unit ray direction for each sensor (pointing along x-axis in sensor frame)
-    unit_ray = np.array([1.0, 0.0, 0.0]).reshape(3, 1)  # (3, 1)
-    unit_rays = np.tile(unit_ray, (N * N_sensors, 1, 1))  # (N*7, 3, 1)
-
-    # Rotate unit rays into global frame: (N*7, 3, 1) -> (N, 7, 2)
-    ray_directions = np.matmul(R_sensor, unit_rays).squeeze(-1)  # (N*7, 3)
-    ray_directions = ray_directions.reshape(N, N_sensors, 3)[:, :, :2]  # (N, 7, 2)
-
-    # Scale ray directions by distance readings
-    # valid_distances: (7, N) -> (N, 7)
-    d = valid_distances.T[:, :, None]  # (N, 7, 1)
-    
-    # Global sensor origins: (N, 3, 7) -> (N, 7, 2)
-    sensor_origins = global_sensors[:, :2, :].transpose(0, 2, 1)  # (N, 7, 2)
-
-    # Global sensor endpoints: (N, 7, 2)
-    global_points = sensor_origins + d * ray_directions  # (N, 7, 2)
-
-    # Transpose to (2, 7, N)
-    global_points = global_points.transpose(2, 1, 0)  # (2, 7, N)
-
-    return global_points
+    Append a timestamp to a filename and add a .npy extension.
+    """
+    t = datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
+    return f"{file_name}_{t}.npy"

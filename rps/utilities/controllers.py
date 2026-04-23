@@ -1,210 +1,233 @@
 import numpy as np
 from rps.utilities.transformations import *
 
-def create_si_position_controller(x_velocity_gain=1, y_velocity_gain=1, velocity_magnitude_limit=0.15):
-    """Creates a position controller for single integrators.  Drives a single integrator to a point
-    using a propoertional controller.
-
-    x_velocity_gain - the gain impacting the x (horizontal) velocity of the single integrator
-    y_velocity_gain - the gain impacting the y (vertical) velocity of the single integrator
-    velocity_magnitude_limit - the maximum magnitude of the produce velocity vector (should be less than the max linear speed of the platform)
-
-    -> function
+def create_si_position_controller(x_velocity_gain=0.8, y_velocity_gain=0.8, velocity_magnitude_limit=0.15):
+    """Creates a single-integrator position controller.
+    
+    Returns a function that drives N single-integrator robots toward desired positions 
+    using proportional control, with output velocities clamped to velocity_magnitude_limit.
     """
+    assert isinstance(x_velocity_gain, (int, float)) and x_velocity_gain > 0, "x_velocity_gain must be a positive number."
+    assert isinstance(y_velocity_gain, (int, float)) and y_velocity_gain > 0, "y_velocity_gain must be a positive number."
+    assert isinstance(velocity_magnitude_limit, (int, float)) and velocity_magnitude_limit >= 0, "velocity_magnitude_limit must be non-negative."
 
-    #Check user input types
-    assert isinstance(x_velocity_gain, (int, float)), "In the function create_si_position_controller, the x linear velocity gain (x_velocity_gain) must be an integer or float. Recieved type %r." % type(x_velocity_gain).__name__
-    assert isinstance(y_velocity_gain, (int, float)), "In the function create_si_position_controller, the y linear velocity gain (y_velocity_gain) must be an integer or float. Recieved type %r." % type(y_velocity_gain).__name__
-    assert isinstance(velocity_magnitude_limit, (int, float)), "In the function create_si_position_controller, the velocity magnitude limit (y_velocity_gain) must be an integer or float. Recieved type %r." % type(y_velocity_gain).__name__
+    gains = np.diag([x_velocity_gain, y_velocity_gain])
+
+    def position_controller_si(states, poses):
+        N = states.shape[1]
+        assert states.shape[0] == 2, "states must be 2xN."
+        assert poses.shape[0] == 2, "poses must be 2xN."
+        assert poses.shape[1] == N, "states and poses must have the same number of columns."
+
+        dx = gains @ (poses - states)
+
+        norms = np.linalg.norm(dx, axis=0)
+        to_clamp = norms > velocity_magnitude_limit
+        if np.any(to_clamp):
+            dx[:, to_clamp] = velocity_magnitude_limit * dx[:, to_clamp] / norms[to_clamp]
+
+        return dx
+
+    return position_controller_si
+
+
+def create_uni_position_controller(x_velocity_gain=0.8, y_velocity_gain=0.8, velocity_magnitude_limit=0.15, projection_distance=0.03):
+    """Creates a unicycle position controller.
     
-    #Check user input ranges/sizes
-    assert x_velocity_gain > 0, "In the function create_si_position_controller, the x linear velocity gain (x_velocity_gain) must be positive. Recieved %r." % x_velocity_gain
-    assert y_velocity_gain > 0, "In the function create_si_position_controller, the y linear velocity gain (y_velocity_gain) must be positive. Recieved %r." % y_velocity_gain
-    assert velocity_magnitude_limit >= 0, "In the function create_si_position_controller, the velocity magnitude limit (velocity_magnitude_limit) must not be negative. Recieved %r." % velocity_magnitude_limit
-    
-    gain = np.diag([x_velocity_gain, y_velocity_gain])
-
-    def si_position_controller(xi, positions):
-
-        """
-        xi: 2xN numpy array (of single-integrator states of the robots)
-        points: 2xN numpy array (of desired points each robot should achieve)
-
-        -> 2xN numpy array (of single-integrator control inputs)
-
-        """
-
-        #Check user input types
-        assert isinstance(xi, np.ndarray), "In the si_position_controller function created by the create_si_position_controller function, the single-integrator robot states (xi) must be a numpy array. Recieved type %r." % type(xi).__name__
-        assert isinstance(positions, np.ndarray), "In the si_position_controller function created by the create_si_position_controller function, the robot goal points (positions) must be a numpy array. Recieved type %r." % type(positions).__name__
-
-        #Check user input ranges/sizes
-        assert xi.shape[0] == 2, "In the si_position_controller function created by the create_si_position_controller function, the dimension of the single-integrator robot states (xi) must be 2 ([x;y]). Recieved dimension %r." % xi.shape[0]
-        assert positions.shape[0] == 2, "In the si_position_controller function created by the create_si_position_controller function, the dimension of the robot goal points (positions) must be 2 ([x_goal;y_goal]). Recieved dimension %r." % positions.shape[0]
-        assert xi.shape[1] == positions.shape[1], "In the si_position_controller function created by the create_si_position_controller function, the number of single-integrator robot states (xi) must be equal to the number of robot goal points (positions). Recieved a single integrator current position input array of size %r x %r and desired position array of size %r x %r." % (xi.shape[0], xi.shape[1], positions.shape[0], positions.shape[1])
-
-        _,N = np.shape(xi)
-        dxi = np.zeros((2, N))
-
-        # Calculate control input
-        dxi[0][:] = x_velocity_gain*(positions[0][:]-xi[0][:])
-        dxi[1][:] = y_velocity_gain*(positions[1][:]-xi[1][:])
-
-        # Threshold magnitude
-        norms = np.linalg.norm(dxi, axis=0)
-        idxs = np.where(norms > velocity_magnitude_limit)
-        if norms[idxs].size != 0:
-            dxi[:, idxs] *= velocity_magnitude_limit/norms[idxs]
-
-        return dxi
-
-    return si_position_controller
-
-def create_clf_unicycle_position_controller(linear_velocity_gain=0.8, angular_velocity_gain=3):
-    """Creates a unicycle model pose controller.  Drives the unicycle model to a given position
-    and orientation. (($u: \mathbf{R}^{3 \times N} \times \mathbf{R}^{2 \times N} \to \mathbf{R}^{2 \times N}$)
-
-    linear_velocity_gain - the gain impacting the produced unicycle linear velocity
-    angular_velocity_gain - the gain impacting the produced unicycle angular velocity
-    
-    -> function
+    Returns a function that drives N unicycle-modeled robots toward desired 2D positions 
+    by wrapping a single-integrator controller with a projection mapping.
     """
+    si_controller = create_si_position_controller(
+        x_velocity_gain=x_velocity_gain, 
+        y_velocity_gain=y_velocity_gain, 
+        velocity_magnitude_limit=velocity_magnitude_limit
+    )
 
-    #Check user input types
-    assert isinstance(linear_velocity_gain, (int, float)), "In the function create_clf_unicycle_position_controller, the linear velocity gain (linear_velocity_gain) must be an integer or float. Recieved type %r." % type(linear_velocity_gain).__name__
-    assert isinstance(angular_velocity_gain, (int, float)), "In the function create_clf_unicycle_position_controller, the angular velocity gain (angular_velocity_gain) must be an integer or float. Recieved type %r." % type(angular_velocity_gain).__name__
-    
-    #Check user input ranges/sizes
-    assert linear_velocity_gain >= 0, "In the function create_clf_unicycle_position_controller, the linear velocity gain (linear_velocity_gain) must be greater than or equal to zero. Recieved %r." % linear_velocity_gain
-    assert angular_velocity_gain >= 0, "In the function create_clf_unicycle_position_controller, the angular velocity gain (angular_velocity_gain) must be greater than or equal to zero. Recieved %r." % angular_velocity_gain
-     
+    si_to_uni_dyn, uni_to_si_states = create_si_to_uni_mapping(projection_distance=projection_distance)
 
-    def position_uni_clf_controller(states, positions):
+    def position_controller_uni(states, poses):
+        assert states.shape[0] == 3, "states must be 3xN."
+        assert poses.shape[0] == 2, "poses must be 2xN."
+        assert poses.shape[1] == states.shape[1], "states and poses must have the same number of columns."
 
-        """  A position controller for unicycle models.  This utilized a control lyapunov function
-        (CLF) to drive a unicycle system to a desired position. This function operates on unicycle
-        states and desired positions to return a unicycle velocity command vector.
-
-        states: 3xN numpy array (of unicycle states, [x;y;theta])
-        poses: 3xN numpy array (of desired positons, [x_goal;y_goal])
-
-        -> 2xN numpy array (of unicycle control inputs)
-        """
-
-        #Check user input types
-        assert isinstance(states, np.ndarray), "In the function created by the create_clf_unicycle_position_controller function, the single-integrator robot states (xi) must be a numpy array. Recieved type %r." % type(states).__name__
-        assert isinstance(positions, np.ndarray), "In the function created by the create_clf_unicycle_position_controller function, the robot goal points (positions) must be a numpy array. Recieved type %r." % type(positions).__name__
-
-        #Check user input ranges/sizes
-        assert states.shape[0] == 3, "In the function created by the create_clf_unicycle_position_controller function, the dimension of the unicycle robot states (states) must be 3 ([x;y;theta]). Recieved dimension %r." % states.shape[0]
-        assert positions.shape[0] == 2, "In the function created by the create_clf_unicycle_position_controller function, the dimension of the robot goal positions (positions) must be 2 ([x_goal;y_goal]). Recieved dimension %r." % positions.shape[0]
-        assert states.shape[1] == positions.shape[1], "In the function created by the create_clf_unicycle_position_controller function, the number of unicycle robot states (states) must be equal to the number of robot goal positions (positions). Recieved a current robot pose input array (states) of size %r states %r and desired position array (positions) of size %r states %r." % (states.shape[0], states.shape[1], positions.shape[0], positions.shape[1])
-
-
-        _,N = np.shape(states)
-        dxu = np.zeros((2, N))
-
-        pos_error = positions - states[:2][:]
-        rot_error = np.arctan2(pos_error[1][:],pos_error[0][:])
-        dist = np.linalg.norm(pos_error, axis=0)
-
-        dxu[0][:]=linear_velocity_gain*dist*np.cos(rot_error-states[2][:])
-        dxu[1][:]=angular_velocity_gain*dist*np.sin(rot_error-states[2][:])
+        xi = uni_to_si_states(states)
+        dxi = si_controller(xi, poses)
+        dxu = si_to_uni_dyn(dxi, states)
 
         return dxu
 
-    return position_uni_clf_controller
-
-def create_clf_unicycle_pose_controller(approach_angle_gain=1, desired_angle_gain=2.7, rotation_error_gain=1):
-    """Returns a controller ($u: \mathbf{R}^{3 \times N} \times \mathbf{R}^{3 \times N} \to \mathbf{R}^{2 \times N}$) 
-    that will drive a unicycle-modeled agent to a pose (i.e., position & orientation). This control is based on a control
-    Lyapunov function.
-
-    approach_angle_gain - affects how the unicycle approaches the desired position
-    desired_angle_gain - affects how the unicycle approaches the desired angle
-    rotation_error_gain - affects how quickly the unicycle corrects rotation errors.
+    return position_controller_uni
 
 
-    -> function
+def create_pose_controller_clf(approach_angle_gain=1, desired_angle_gain=2.7, rotation_error_gain=1, 
+                               wheel_velocity_limit=10.0, wheel_radius=0.016, base_length=0.105):
+    """Creates a unicycle pose controller based on a Control Lyapunov Function (CLF).
+    
+    Returns a function that drives N unicycle-modeled robots to desired poses 
+    (position + orientation) simultaneously.
     """
-
     gamma = approach_angle_gain
     k = desired_angle_gain
     h = rotation_error_gain
 
-    def R(theta):
-        return np.array([[np.cos(theta), -np.sin(theta)],[np.sin(theta),np.cos(theta)]])
+    D = np.array([[wheel_radius/2, wheel_radius/2], 
+                  [-wheel_radius/base_length, wheel_radius/base_length]])
+    Dinv = np.linalg.inv(D)
 
-    def pose_uni_clf_controller(states, poses):
+    def controller_clf(states, poses):
+        N = states.shape[1]
+        assert states.shape[0] == 3, "states must be 3xN."
+        assert poses.shape[0] == 3, "poses must be 3xN."
+        assert poses.shape[1] == N, "states and poses must have the same number of columns."
 
-        N_states = states.shape[1]
-        dxu = np.zeros((2,N_states))
+        dxu = np.zeros((2, N))
 
-        for i in range(N_states):
-            translate = R(-poses[2,i]).dot((poses[:2,i]-states[:2,i]))
-            e = np.linalg.norm(translate)
-            theta = np.arctan2(translate[1],translate[0])
-            alpha = theta - (states[2,i]-poses[2,i])
-            alpha = np.arctan2(np.sin(alpha),np.cos(alpha))
+        for i in range(N):
+            theta_goal = poses[2, i]
+            R = np.array([[np.cos(-theta_goal), -np.sin(-theta_goal)], 
+                          [np.sin(-theta_goal),  np.cos(-theta_goal)]])
+            
+            pos_error = R @ (poses[:2, i] - states[:2, i])
+
+            e = np.linalg.norm(pos_error)
+            theta = np.arctan2(pos_error[1], pos_error[0])
+            alpha = theta - (states[2, i] - poses[2, i])
+            alpha = np.arctan2(np.sin(alpha), np.cos(alpha))
 
             ca = np.cos(alpha)
             sa = np.sin(alpha)
 
-            dxu[0,i] = gamma* e* ca
-            dxu[1,i] = k*alpha + gamma*((ca*sa)/alpha)*(alpha + h*theta)
+            dxu[0, i] = gamma * e * ca
+            
+            # Prevent division by zero mathematically
+            if np.abs(alpha) < 1e-6:
+                sinc_alpha = 1.0
+            else:
+                sinc_alpha = sa / alpha
+                
+            dxu[1, i] = k * alpha + gamma * (ca * sinc_alpha) * (alpha + h * theta)
+
+            wheel_vels = Dinv @ dxu[:, i]
+            max_wheel = np.max(np.abs(wheel_vels))
+            if max_wheel > wheel_velocity_limit:
+                dxu[:, i] = dxu[:, i] * (wheel_velocity_limit / max_wheel)
 
         return dxu
 
-    return pose_uni_clf_controller
+    return controller_clf
 
-def create_hybrid_unicycle_pose_controller(linear_velocity_gain=1, angular_velocity_gain=2, velocity_magnitude_limit=0.15, angular_velocity_limit=np.pi, position_error=0.05, position_epsilon=0.03, rotation_error=0.05):
-    '''Returns a controller ($u: \mathbf{R}^{3 \times N} \times \mathbf{R}^{3 \times N} \to \mathbf{R}^{2 \times N}$)
-    that will drive a unicycle-modeled agent to a pose (i.e., position & orientation). This controller is
-    based on a hybrid controller that will drive the robot in a straight line to the desired position then rotate
-    to the desired position.
+
+def create_pose_controller_hybrid(linear_velocity_gain=0.8, angular_velocity_limit=np.pi, 
+                                  velocity_magnitude_limit=0.15, position_error=0.03, 
+                                  position_epsilon=0.01, rotation_error=0.05):
+    """Creates a unicycle pose controller based on a two-phase hybrid control strategy.
     
-    linear_velocity_gain - affects how much the linear velocity is scaled based on the position error
-    angular_velocity_gain - affects how much the angular velocity is scaled based on the heading error
-    velocity_magnitude_limit - threshold for the max linear velocity that will be achieved by the robot
-    angular_velocity_limit - threshold for the max rotational velocity that will be achieved by the robot
-    position_error - the error tolerance for the final position of the robot
-    position_epsilon - the amount of translational distance that is allowed by the rotation before correcting position again.
-    rotation_error - the error tolerance for the final orientation of the robot
+    Returns a function that drives N unicycle robots to desired poses using a 
+    sequential two-phase approach (APPROACH -> ROTATE).
+    """
+    si_to_uni = create_si_to_uni_dynamics(linear_velocity_gain=linear_velocity_gain, 
+                                          angular_velocity_limit=angular_velocity_limit)
 
-    '''
+    # Mimics MATLAB's persistent closure state
+    internal_state = {'approach_state': np.array([])}
 
-    si_to_uni_dyn = create_si_to_uni_dynamics(linear_velocity_gain=linear_velocity_gain, angular_velocity_limit=angular_velocity_limit)
+    def controller_hybrid(states, poses, in_approach_state=None):
+        N = states.shape[1]
 
-    def pose_uni_hybrid_controller(states, poses, approach_state = np.empty([0,0])):
-        N=states.shape[1]
-        dxu = np.zeros((2,N))
+        if in_approach_state is not None:
+            approach_state = in_approach_state
+        else:
+            if internal_state['approach_state'].shape[0] != N:
+                internal_state['approach_state'] = np.ones(N)
+            approach_state = internal_state['approach_state']
 
-        #This is essentially a hack since default arguments are evaluated only once we will mutate it with each call
-        if approach_state.shape[1] != N: 
-            approach_state = np.ones((1,N))[0]
+        dxu = np.zeros((2, N))
 
         for i in range(N):
-            wrapped = poses[2,i] - states[2,i]
-            wrapped = np.arctan2(np.sin(wrapped),np.cos(wrapped))
+            pos_vec = poses[:2, i] - states[:2, i]
+            pos_dist = np.linalg.norm(pos_vec)
+            
+            heading_err = poses[2, i] - states[2, i]
+            heading_err = np.arctan2(np.sin(heading_err), np.cos(heading_err))
 
-            dxi = poses[:2,[i]] - states[:2,[i]]
+            if approach_state[i] and pos_dist > position_error - position_epsilon:
+                # Phase 1: APPROACH
+                if pos_dist > velocity_magnitude_limit:
+                    pos_vec = velocity_magnitude_limit * pos_vec / pos_dist
+                
+                dx_uni = si_to_uni(pos_vec.reshape(2, 1), states[:, i].reshape(3, 1))
+                dxu[:, i] = dx_uni.flatten()
 
-            #Normalize Vector
-            norm_ = np.linalg.norm(dxi)
+            elif np.abs(heading_err) > rotation_error:
+                # Phase 2: ROTATE
+                approach_state[i] = 1 if pos_dist > position_error else 0
+                dxu[0, i] = 0
+                dxu[1, i] = 2 * heading_err
 
-            if(norm_ > (position_error - position_epsilon) and approach_state[i]):
-                if(norm_ > velocity_magnitude_limit):
-                    dxi = velocity_magnitude_limit*dxi/norm_
-                dxu[:,[i]] = si_to_uni_dyn(dxi, states[:,[i]])
-            elif(np.absolute(wrapped) > rotation_error):
-                approach_state[i] = 0
-                if(norm_ > position_error):
-                    approach_state = 1
-                dxu[0,i] = 0
-                dxu[1,i] = angular_velocity_gain*wrapped
             else:
-                dxu[:,[i]] = np.zeros((2,1))
+                # CONVERGED
+                dxu[:, i] = 0
 
+        if in_approach_state is not None:
+            return dxu, approach_state
         return dxu
 
-    return pose_uni_hybrid_controller
+    return controller_hybrid
+
+
+def create_pose_parking_controller_clf(approach_angle_gain=1, desired_angle_gain=2.7, rotation_error_gain=1, 
+                                       wheel_velocity_limit=10.0, wheel_radius=0.016, base_length=0.105, 
+                                       position_error=0.05, rotation_error=0.2):
+    """Wraps create_pose_controller_clf to zero out commands for robots that have 
+    already reached their goal pose.
+    """
+    clf_controller = create_pose_controller_clf(
+        approach_angle_gain=approach_angle_gain,
+        desired_angle_gain=desired_angle_gain,
+        rotation_error_gain=rotation_error_gain,
+        wheel_velocity_limit=wheel_velocity_limit,
+        wheel_radius=wheel_radius,
+        base_length=base_length
+    )
+
+    def controller_clf_parking(states, poses):
+        dxu = clf_controller(states, poses)
+
+        pos_converged = np.linalg.norm(states[:2, :] - poses[:2, :], axis=0) < position_error
+        rot_converged = np.abs(np.arctan2(np.sin(states[2, :] - poses[2, :]),
+                                          np.cos(states[2, :] - poses[2, :]))) < rotation_error
+        converged = pos_converged & rot_converged
+
+        dxu[:, converged] = 0
+        return dxu
+
+    return controller_clf_parking
+
+
+def create_pose_parking_controller_hybrid(linear_velocity_gain=0.8, angular_velocity_limit=np.pi, 
+                                          velocity_magnitude_limit=0.15, position_error=0.05, 
+                                          position_epsilon=0.01, rotation_error=0.2):
+    """Wraps create_pose_controller_hybrid to zero out commands for robots that have 
+    already reached their goal pose.
+    """
+    hybrid_controller = create_pose_controller_hybrid(
+        linear_velocity_gain=linear_velocity_gain,
+        angular_velocity_limit=angular_velocity_limit,
+        velocity_magnitude_limit=velocity_magnitude_limit,
+        position_error=position_error,
+        position_epsilon=position_epsilon,
+        rotation_error=rotation_error
+    )
+
+    def controller_hybrid_parking(states, poses):
+        dxu = hybrid_controller(states, poses)
+
+        pos_converged = np.linalg.norm(states[:2, :] - poses[:2, :], axis=0) < position_error
+        rot_converged = np.abs(np.arctan2(np.sin(states[2, :] - poses[2, :]),
+                                          np.cos(states[2, :] - poses[2, :]))) < rotation_error
+        converged = pos_converged & rot_converged
+
+        dxu[:, converged] = 0
+        return dxu
+
+    return controller_hybrid_parking
