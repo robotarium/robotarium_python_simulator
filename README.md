@@ -44,7 +44,7 @@ The current list of libraries supported by the robotarium is contained in [libra
 To run one of the examples:
 
  ```
- python "path_to_simulator"/rps/examples/plotting/barrier_certificates_with_plotting.py
+ python "path_to_simulator"/rps/examples/plotting/barriers_with_plotting.py
  ```
 
 ## Package Structure
