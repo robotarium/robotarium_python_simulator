@@ -85,3 +85,4 @@ jax
 jaxlib
 jaxopt
 flax
+msgpack
