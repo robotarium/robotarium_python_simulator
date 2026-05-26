@@ -84,3 +84,4 @@ zipp==3.23.0
 jax
 jaxlib
 jaxopt
+flax
