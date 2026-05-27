@@ -86,3 +86,4 @@ jaxlib
 jaxopt
 flax
 msgpack
+optax
