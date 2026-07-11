@@ -126,6 +126,7 @@ class ARobotarium(ABC):
         assert velocities.shape[1] <= self.number_of_robots, (
             f"Column count of velocities ({velocities.shape[1]}) must be <= number_of_robots ({self.number_of_robots})"
         )
+        ids = np.atleast_1d(ids)
         self._velocities[:, ids] = velocities
 
     def robot_colormap(self) -> plt.cm.ScalarMappable:
