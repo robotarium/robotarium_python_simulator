@@ -1,5 +1,6 @@
 import numpy as np
 import rps.robotarium as robotarium
+from rps.utilities.transformations import create_si_to_uni_mapping
 from rps.utilities.barrier_certificates import create_uni_barrier_certificate_with_boundary
 from rps.utilities.controllers import create_uni_position_controller
 from rps.utilities.misc import generate_random_poses, create_at_position
@@ -10,6 +11,7 @@ r = robotarium.Robotarium(number_of_robots=N, show_figure=True, initial_conditio
 
 unicycle_barrier_certificate = create_uni_barrier_certificate_with_boundary()
 uni_position_controller = create_uni_position_controller()
+si_to_uni, uni_to_si = create_si_to_uni_mapping()
 
 position_error = 0.05
 at_position = create_at_position(position_error=position_error)
@@ -21,12 +23,14 @@ goal_points = generate_random_poses(N, width=arena_width, height=arena_height, s
 goal_points = goal_points[:2, :]
 
 x = r.get_poses()
+xi = uni_to_si(x)
 r.step()
 
 already_reported = np.zeros(N, dtype=bool)
 
-while not at_position(x, goal_points)[0]:
+while not at_position(xi, goal_points)[0]:
     x = r.get_poses()
+    xi = uni_to_si(x)
 
     dxu = uni_position_controller(x, goal_points)
     dxu = unicycle_barrier_certificate(dxu, x)
@@ -34,7 +38,7 @@ while not at_position(x, goal_points)[0]:
     r.set_velocities(np.arange(N), dxu)
     r.step()
 
-    _, converged = at_position(x, goal_points)
+    _, converged = at_position(xi, goal_points)
     newly_arrived = converged & ~already_reported
     for i in np.where(newly_arrived)[0]:
         print(f"Robot {i+1} has reached its goal position.")

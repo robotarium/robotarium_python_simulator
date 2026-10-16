@@ -189,7 +189,7 @@ while not at_position(x[:2, :], goals[:2, :])[0]:
                 if np.linalg.norm(end_point - hitpoint[0]) <= AVOID_DISTANCE:
                     new_hitpoint = False
                     hitpoint[1] += 1
-                    if hitpoint[1] == 5:
+                    if hitpoint[1] == 20:
                         new_obstacle = True
                         break
             if new_hitpoint:
