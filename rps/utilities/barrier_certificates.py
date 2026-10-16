@@ -127,9 +127,6 @@ def create_si_barrier_certificate_with_boundary(safety_radius=0.15, barrier_gain
     def barrier_certificate(dxi, x):
         N = dxi.shape[1]
 
-        if N < 2:
-            return dxi
-
         bp = boundary_points if boundary_points is not None else np.array([-1.7, 1.7, -1.1, 1.1])
         dxi = np.copy(dxi)
 
@@ -292,8 +289,6 @@ def create_uni_barrier_certificate_with_boundary(safety_radius=0.12, barrier_gai
 
     def barrier_unicycle(dxu, x, obstacles=None):
         N = dxu.shape[1]
-        if N < 2:
-            return dxu
 
         # 1. Map unicycle states/inputs -> single-integrator domain
         xi = uni_si_states(x)
